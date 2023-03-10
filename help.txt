@@ -1,0 +1,3 @@
+for grpc client generation:
+
+python -m grpc_tools.protoc -Iproto --python_out=. --grpc_python_out=. proto/gossip-client.proto

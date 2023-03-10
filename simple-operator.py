@@ -3,15 +3,12 @@ from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 import time
 
-
-
-
 # Load in-cluster configuration
 config.load_incluster_config()
 
+
 @kopf.on.create('gossip.io', 'v1', 'graphs')
 def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
-
     api = client.CoreV1Api()
 
     # Convert the adjacency list from a comma-separated string to a list of tuples
@@ -23,27 +20,26 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
             adjacency_list.append(edge)
     logger.info(f'The graph has the adjacency list: {adjacency_list}')
 
-    nodes = [str[0] for str in str_adj_list.split(',')]
+    nodes = [split_str[0] for split_str in str_adj_list.split(',')]
     logger.info(f'The graph has the nodes: {nodes}')
 
     edges = []
     for adj in adjacency_list:
         origin = adj[0]
-        es =  ([(origin, neighbor) for neighbor in adj[1:]])
+        es = ([(origin, neighbor) for neighbor in adj[1:]])
         if es:
             edges = edges + es
     logger.info(f'The graph has the edges: {edges}')
 
-    
     def create_pods():
 
-         # Create a dictionary to store the Pod names and their node number
-        pod_dict = {}
+        # Create a dictionary to store the Pod names and their node number
+        pod_dictionary = {}
         # Create a Pod for each node in the graph
         for node in nodes:
             # Create a Pod for this node
             pod_name = f'{name}-node-{node}'
-            pod_dict[node] = pod_name
+            pod_dictionary[node] = pod_name
 
             pod = client.V1Pod(
                 metadata=client.V1ObjectMeta(
@@ -51,7 +47,7 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
                     namespace=namespace,
                     labels={
                         'app': 'gossip',
-                        'graph': name, 
+                        'graph': name,
                         'node': str(node)
                     }
                 ),
@@ -73,13 +69,13 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
 
         logger.info(f'Finished creating Pods for graph {name}')
 
-        return pod_dict
-        
+        return pod_dictionary
+
     def create_services():
 
-        for edge in edges:
-            node1 = pod_dict[str(edge[0])]
-            node2 = pod_dict[str(edge[1])]
+        for e in edges:
+            node1 = pod_dict[str(e[0])]
+            node2 = pod_dict[str(e[1])]
 
             if node1 and node2:
                 service_name = f'{name}-service-{node1}-{node2}'
@@ -87,13 +83,13 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
                 labels = {
                     'app': 'gossip',
                     'graph': name,
-                    'node': str(edge[0])
+                    'node': str(e[0])
                 }
 
                 selector = {
                     'app': 'gossip',
                     'graph': name,
-                    'node': str(edge[1])
+                    'node': str(e[1])
                 }
 
                 port = client.V1ServicePort(
@@ -122,12 +118,8 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
 
         logger.info(f'Finished creating Services for graph {name}')
 
-
-
     pod_dict = create_pods()
 
     create_services()
 
     logger.info(f'Finished creating Graph {name}')
-    
-

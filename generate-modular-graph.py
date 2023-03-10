@@ -172,6 +172,27 @@ def save_graph_as_adj_list(graph, name):
         for line in nx.generate_adjlist(graph):
             f.write(line + ',')
 
+def save_graph_as_adj_matrix(graph, name):
+    """
+    Save the given graph as an adjacency matrix.
+
+    Args:
+        graph (NetworkX graph): The graph to save.
+        name (str): The name of the file to save the adjacency matrix as.
+
+    Returns:
+        None
+    """
+    # Get the adjacency matrix of the graph
+    adj_matrix = nx.adjacency_matrix(graph)
+
+    # Write the adjacency matrix to a file
+    with open('./generated_graphs/{}.adj-matrix'.format(name), 'w') as f:
+        for row in adj_matrix.todense():
+            # Convert the row to a comma-separated string of integers
+            row_str = ','.join(str(x) for x in row.tolist()[0])
+            f.write(row_str + '\n')
+
 
 def plot(graph, name, num_comm=0, use_louvain=False):
     """
@@ -283,6 +304,7 @@ G.add_nodes_from([1, 2, 3, 4])
 G.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 1)])
 simple_graph_name = 'simple_graph'
 save_graph_as_adj_list(G, simple_graph_name)
+save_graph_as_adj_matrix(G, simple_graph_name)
 plot(G, simple_graph_name)
 
 # Create a modular graph
@@ -308,7 +330,7 @@ plot(scale_free_graph, '{}_louvain_comm'.format(scale_free_graph_name), num_comm
 
 
 # Create a scale free graph
-barabasi_albert_graph = generate_barabasi_albert_graph(100, 3)
+barabasi_albert_graph = generate_barabasi_albert_graph(100, 1)
 barabasi_albert_graph_name = 'barabasi_albert_graph'
 apply_louvain(barabasi_albert_graph)
 print('{} has modularity of {}'.format(barabasi_albert_graph_name, compute_modularity(barabasi_albert_graph, use_louvain=True)))
