@@ -1,66 +1,104 @@
 import grpc
 import random
 import time
-import gossip_pb2
-import gossip_pb2_grpc
+import sys
 import socket
 import os
 from concurrent import futures
+import threading
 
+sys.path.append("/app/grpc_compiled")
+import gossip_pb2
+import gossip_pb2_grpc
+
+
+class ValueEntry:
+    def __init__(self, participations, value):
+        self.participations = participations
+        self.value = value     
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
+    
     def __init__(self):
         self.value = random.randint(0, 100)
-        self.value_history = [(0, self.value)]
-        self.num_gossip_calls = 0
-        print('GossipService initialized with value {}'.format(self.value))
+        self.participations = 0
+        self.value_entries = []
+        self.value_entries.append(ValueEntry(0, self.value))
         self.neighbors = os.environ.get("NEIGHBORS").rstrip(',').split(",")
         self.name = os.environ.get("HOSTNAME")
+        print(f'GossipService initialized on {self.name} with value {self.value}.')
+        print(f"Received neighbors: {self.neighbors}")
+
+    def process_gossip_data(self, data):
+        self.participations += 1
+        peer_value = int(data.decode('utf-8'))
+        print(f"Received peer value: {peer_value}, Current value: {self.value}")
+        self.value = min(self.value, peer_value)
+        print(f"Value after gossiping: {self.value}")
+        self.value_entries.append(ValueEntry(self.participations, self.value))
+
 
     def gossip(self):
         print('Starting to gossip.')
-        self.num_gossip_calls += 1
-        self.value -= 1
-        self.value_history.append((self.num_gossip_calls, self.value))
-
         neighbor = random.choice(self.neighbors)
-        # naming convention always node with smaller index first (?)
-        # export naming function to a common utils file
-        if self.name < neighbor:
-            service = f'service-{self.name}-{neighbor}'
-        else:
-            service = f'service-{neighbor}-{self.name}'
+        print(f"Selected neighbor {neighbor} for gossiping.")
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                client_socket.connect((neighbor, 90))
+                client_socket.sendall(bytes(str(self.value), 'utf-8'))
+                print(f"Sent {self.value} over TCP socket.")
+                data = client_socket.recv(1024)
+                self.process_gossip_data(data)
+        except socket.error as e:
+            print(f"Socket error occurred: {str(e)}")
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as peer_sock:
-            peer_sock.connect((service, 90))
-            peer_sock.sendall(bytes(str(self.value), 'utf-8'))
-            data = peer_sock.recv(1024)
-            peer_value = int(data.decode('utf-8'))
-            self.value = min(self.value, peer_value)
-            self.value_history.append(self.num_gossip_calls, self.value)
         print('Finished gossiping.')
 
     def Gossip(self, request, context):
+        print('[GRPC Gossip invoked]')
         self.gossip()
-
-    def Gossip(self, request, context):
-        print('GRPC Gossip invoked.')
-        self.gossip()
-        last_entry = self.value_history[-1]
-        return gossip_pb2.GossipResponse(
-            value_entry=gossip_pb2.ValueEntry(num_gossip_calls=last_entry[0], value=last_entry[1]))
+        return gossip_pb2.GossipResponse()
 
     def History(self, request, context):
-        print('GRPC History invoked.')
-        return gossip_pb2.HistoryResponse(
-            value_history=[gossip_pb2.ValueEntry(value=v, num_gossip_calls=c) for v, c in self.value_history])
+        print('[GRPC History invoked]')
+        value_entries =[gossip_pb2.ValueEntry( participations=entry.participations, value=entry.value) 
+            for entry in self.value_entries]
+        return gossip_pb2.HistoryResponse(value_entries=value_entries)
 
+    def CurrentValue(self, request, context):
+        print('[GRPC CurrentValue invoked]')
+        print(f"Returning value {self.value}.")
+        return gossip_pb2.CurrentValueResponse(value=self.value)
+
+    def listen_for_connections(self):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+                server_socket.bind((self.name, 90))
+                server_socket.listen(1)
+                print('Listening on port 90 for incoming gossip...')
+                while True:
+                    conn, addr = server_socket.accept()
+                    try: 
+                        print(f'Gossiping request accepted from {addr[0]}:{addr[1]}')
+                        # Process incoming data
+                        data = conn.recv(1024)
+                        self.process_gossip_data(data)
+                        conn.sendall(bytes(str(self.value), 'utf-8'))
+                        print(f"Responded with value of {self.value} over TCP socket.")
+                    finally:
+                        conn.close()
+        except socket.error as e:
+            print(f"Socket error occurred: {str(e)}")
 
 def serve():
+    service = GossipService()
     server = grpc.server(futures.ThreadPoolExecutor())
-    gossip_pb2_grpc.add_GossipServicer_to_server(GossipService(), server)
+    gossip_pb2_grpc.add_GossipServicer_to_server(service, server)
     server.add_insecure_port('[::]:50051')
     server.start()
+      # Start the listen_for_connections method in a background thread
+    listen_thread = threading.Thread(target=service.listen_for_connections)
+    listen_thread.start()
     print("Server started on port 50051")
     try:
         while True:

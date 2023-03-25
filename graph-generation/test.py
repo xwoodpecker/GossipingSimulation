@@ -7,10 +7,27 @@ for edge_str in adj_li.split(','):
         edge = tuple(map(int, edge_str.strip().split()))
         adjacency_list.append(edge)
 
-#print(adjacency_list)
+
+entries = [split_str for split_str in adj_li.split(',')]
+
+nodes = [entry[0] for entry in entries]
+
+edge_dict = {}
+for entry in entries:
+    sub_entries = entry.split()
+    key = sub_entries[0]
+    edges = []
+    for sub_entry in sub_entries[1:]:
+        edge = (key, sub_entry)
+        edges.append(edge)
+        edge_dict[key] = edges
+
+print(edge_dict)
+
+
 
 nodes = [s[0] for s in adj_li.split(',')]
-print(nodes)
+#print(nodes)
 
 
 #for node in nodes:
@@ -36,7 +53,7 @@ for node in nodes:
     pod_name = f'{name}-node-{node}'
     pod_dict[node] = pod_name
 
-print(pod_dict)
+#print(pod_dict)
 
 for edge in edges:
     node1 = pod_dict[str(edge[0])]
@@ -57,6 +74,6 @@ for edge in edges:
             'node': str(edge[1])
         }
 
-        print(edge)
-        print(labels)
-        print(selector)
+        #print(edge)
+        #print(labels)
+        #print(selector)

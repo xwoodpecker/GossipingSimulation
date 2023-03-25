@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cgossip.proto\x12\x06gossip\"\x0f\n\rGossipRequest\"9\n\x0eGossipResponse\x12\'\n\x0bvalue_entry\x18\x01 \x01(\x0b\x32\x12.gossip.ValueEntry\"\x10\n\x0eHistoryRequest\"<\n\x0fHistoryResponse\x12)\n\rvalue_history\x18\x01 \x03(\x0b\x32\x12.gossip.ValueEntry\"5\n\nValueEntry\x12\x18\n\x10num_gossip_calls\x18\x01 \x01(\x05\x12\r\n\x05value\x18\x02 \x01(\x05\x32\x81\x01\n\x06Gossip\x12\x39\n\x06Gossip\x12\x15.gossip.GossipRequest\x1a\x16.gossip.GossipResponse\"\x00\x12<\n\x07History\x12\x16.gossip.HistoryRequest\x1a\x17.gossip.HistoryResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cgossip.proto\x12\x06gossip\"\x0f\n\rGossipRequest\"\x10\n\x0eGossipResponse\"\x10\n\x0eHistoryRequest\"<\n\x0fHistoryResponse\x12)\n\rvalue_entries\x18\x01 \x03(\x0b\x32\x12.gossip.ValueEntry\"\x15\n\x13\x43urrentValueRequest\"%\n\x14\x43urrentValueResponse\x12\r\n\x05value\x18\x01 \x01(\x05\"3\n\nValueEntry\x12\x16\n\x0eparticipations\x18\x01 \x01(\x05\x12\r\n\x05value\x18\x02 \x01(\x05\x32\xce\x01\n\x06Gossip\x12\x39\n\x06Gossip\x12\x15.gossip.GossipRequest\x1a\x16.gossip.GossipResponse\"\x00\x12<\n\x07History\x12\x16.gossip.HistoryRequest\x1a\x17.gossip.HistoryResponse\"\x00\x12K\n\x0c\x43urrentValue\x12\x1b.gossip.CurrentValueRequest\x1a\x1c.gossip.CurrentValueResponse\"\x00\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'gossip_pb2', globals())
@@ -23,13 +23,17 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _GOSSIPREQUEST._serialized_start=24
   _GOSSIPREQUEST._serialized_end=39
   _GOSSIPRESPONSE._serialized_start=41
-  _GOSSIPRESPONSE._serialized_end=98
-  _HISTORYREQUEST._serialized_start=100
-  _HISTORYREQUEST._serialized_end=116
-  _HISTORYRESPONSE._serialized_start=118
-  _HISTORYRESPONSE._serialized_end=178
-  _VALUEENTRY._serialized_start=180
-  _VALUEENTRY._serialized_end=233
-  _GOSSIP._serialized_start=236
-  _GOSSIP._serialized_end=365
+  _GOSSIPRESPONSE._serialized_end=57
+  _HISTORYREQUEST._serialized_start=59
+  _HISTORYREQUEST._serialized_end=75
+  _HISTORYRESPONSE._serialized_start=77
+  _HISTORYRESPONSE._serialized_end=137
+  _CURRENTVALUEREQUEST._serialized_start=139
+  _CURRENTVALUEREQUEST._serialized_end=160
+  _CURRENTVALUERESPONSE._serialized_start=162
+  _CURRENTVALUERESPONSE._serialized_end=199
+  _VALUEENTRY._serialized_start=201
+  _VALUEENTRY._serialized_end=252
+  _GOSSIP._serialized_start=255
+  _GOSSIP._serialized_end=461
 # @@protoc_insertion_point(module_scope)

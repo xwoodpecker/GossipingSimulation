@@ -1,10 +1,22 @@
-FROM python:3.8-slim-buster
+FROM python:3.7-alpine as base
 
-WORKDIR /app
+RUN apk add --update \
+    gcc \
+    g++ \
+    make \
+    musl-dev \
+    python3-dev \
+    libc6-compat \
+    && rm -rf /var/cache/apk/*
 
-COPY requirements.txt .
-RUN pip install grpcio grpcio
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-COPY . .
+# install all requirements
+RUN pip install protobuf grpcio
 
-CMD ["python", "runner.py"]
+COPY grpc_compiled /app/grpc_compiled/
+COPY gossip-service.py /app/service.py
+
+CMD ["python", "-u", "/app/service.py"]

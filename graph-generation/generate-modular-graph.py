@@ -168,7 +168,7 @@ def save_graph_as_adj_list(graph, name):
           None
       """
     # Save the graph as an adjacency list
-    with open('./generated_graphs/{}.adj-list'.format(name), 'w') as f:
+    with open('./_generated_graphs/{}.adj-list'.format(name), 'w') as f:
         for line in nx.generate_adjlist(graph):
             f.write(line + ',')
 
@@ -187,7 +187,7 @@ def save_graph_as_adj_matrix(graph, name):
     adj_matrix = nx.adjacency_matrix(graph)
 
     # Write the adjacency matrix to a file
-    with open('./generated_graphs/{}.adj-matrix'.format(name), 'w') as f:
+    with open('./_generated_graphs/{}.adj-matrix'.format(name), 'w') as f:
         for row in adj_matrix.todense():
             # Convert the row to a comma-separated string of integers
             row_str = ','.join(str(x) for x in row.tolist()[0])
@@ -230,7 +230,7 @@ def plot(graph, name, num_comm=0, use_louvain=False):
     g.layout(prog='dot')
 
     # Draw the graph
-    g.draw('./generated_graphs/{}.png'.format(name))
+    g.draw('./_generated_graphs/{}.png'.format(name))
 
 
 def apply_louvain(graph):

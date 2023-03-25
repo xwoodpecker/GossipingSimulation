@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package gossip;
+
+service Gossip {
+  rpc Gossip(GossipRequest) returns (GossipResponse) {}
+  rpc History(HistoryRequest) returns (HistoryResponse) {}
+  rpc CurrentValue(CurrentValueRequest) returns (CurrentValueResponse) {}
+}
+
+message GossipRequest {
+}
+
+message GossipResponse {
+}
+
+message HistoryRequest {
+}
+
+message HistoryResponse {
+  repeated ValueEntry value_entries = 1;
+}
+
+message CurrentValueRequest {
+}
+
+message CurrentValueResponse {
+  int32 value = 1;
+}
+
+message ValueEntry {
+  int32 participations = 1;
+  int32 value = 2;
+}

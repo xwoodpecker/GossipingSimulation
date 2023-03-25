@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-node-1
+  labels:
+    app: gossip
+    graph: test
+    node: node-1
+spec:
+  clusterIP: None
+  selector:
+    app: gossip
+    graph: test
+    node: node-1
+  ports:
+    - name: tcp
+      port: 90
+      targetPort: tcp
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-node-2
+  labels:
+    app: gossip
+    graph: test
+    node: node-2
+spec:
+  clusterIP: None
+  selector:
+    app: gossip
+    graph: test
+    node: node-2
+  ports:
+    - name: tcp
+      port: 90
+      targetPort: tcp
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-node-3
+  labels:
+    app: gossip
+    graph: test
+    node: node-3
+spec:
+  clusterIP: None
+  selector:
+    app: gossip
+    graph: test
+    node: node-3
+  ports:
+    - name: tcp
+      port: 90
+      targetPort: tcp
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-runner
+  labels:
+    app: gossip
+    graph: test
+    node: runner
+spec:
+  clusterIP: None
+  selector:
+    app: gossip
+    graph: test
+    node: runner
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc

@@ -25,8 +25,13 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
 
     nodes = [entry[0] for entry in entries]
 
+    edge_dict = {}
+
 
     logger.info(f'The graph has the nodes: {nodes}')
+
+
+
 
     edges = []
     for adj in adjacency_list:
@@ -51,6 +56,7 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
                         'graph': name,
                         'node': str(node)
                     }
+            labels.
 
             pod = client.V1Pod(
                 metadata=client.V1ObjectMeta(
@@ -78,56 +84,58 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
 
         return pod_dictionary
 
-   
-    
     def create_services():
 
-        for node in pod_dict:
+        for e in edges:
+            node1 = pod_dict[str(e[0])]
+            node2 = pod_dict[str(e[1])]
 
-            pod_name = pod_dict[node]
-            service_name=pod_name
+            # naming convention always node with smaller index first (?)
+            # export naming function to a common utils file
 
-            # this does not work I think
-            labels = {
-                'app': 'gossip',
-                'graph': name,
-                'node': str(node)
-            }
-            selector = {
-                'app': 'gossip',
-                'graph': name,
-                'node': str(node)
-            }
-            ports = [
-            client.V1ServicePort(
-                name='tcp',
-                port=90,
-                target_port='tcp'
-            ),
-            client.V1ServicePort(
-                name='grpc',
-                port=50051,
-                target_port='grpc'
-            )
-        ]
+            if node1 and node2:
+                service_name = f'{name}-service-{node1}-{node2}'
 
-            service = client.V1Service(
-                metadata=client.V1ObjectMeta(
-                    name=service_name,
-                    labels=labels
-                ),
-                spec=client.V1ServiceSpec(
-                    selector=selector,
-                    ports=ports,
-                    cluster_ip=None
+                # this does not work I think
+                labels = {
+                    'app': 'gossip',
+                    'graph': name
+                }
+                selector = {
+                    'app': 'gossip',
+                    'graph': name,
+                    'matchExpressions': [
+                        {
+                            'key': 'node',
+                            'operator': 'In',
+                            'values': [str(e[0]), str(e[1])]
+                        }
+                    ]
+                }
+
+                port = client.V1ServicePort(
+                    name='tcp',
+                    port=80,
+                    target_port=80
                 )
-            )
 
-            try:
-                api.create_namespaced_service(namespace=namespace, body=service)
-                logger.info(f'Service {service_name} created')
-            except ApiException as e:
-                logger.error(f'Error creating service: {e}')
+                service = client.V1Service(
+                    metadata=client.V1ObjectMeta(
+                        name=service_name,
+                        labels=labels
+                    ),
+                    spec=client.V1ServiceSpec(
+                        selector=selector,
+                        ports=[port],
+                        type='ClusterIP'
+                    )
+                )
+
+                try:
+                    api.create_namespaced_service(namespace=namespace, body=service)
+                    logger.info(f'Service {service_name} created')
+                except ApiException as e:
+                    logger.error(f'Error creating service: {e}')
 
         logger.info(f'Finished creating Services for graph {name}')
 
