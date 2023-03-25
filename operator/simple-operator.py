@@ -77,19 +77,27 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
             node1 = pod_dict[str(e[0])]
             node2 = pod_dict[str(e[1])]
 
+            # naming convention always node with smaller index first (?)
+            # export naming function to a common utils file
+
             if node1 and node2:
                 service_name = f'{name}-service-{node1}-{node2}'
 
+                # this does not work I think
                 labels = {
                     'app': 'gossip',
-                    'graph': name,
-                    'node': str(e[0])
+                    'graph': name
                 }
-
                 selector = {
                     'app': 'gossip',
                     'graph': name,
-                    'node': str(e[1])
+                    'matchExpressions': [
+                        {
+                            'key': 'node',
+                            'operator': 'In',
+                            'values': [str(e[0]), str(e[1])]
+                        }
+                    ]
                 }
 
                 port = client.V1ServicePort(
