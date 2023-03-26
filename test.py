@@ -12,17 +12,23 @@ entries = [split_str for split_str in adj_li.split(',')]
 
 nodes = [entry[0] for entry in entries]
 
-edge_dict = {}
+neighbors = {}
+for node in nodes:
+    neighbors[node] = []
+
 for entry in entries:
     sub_entries = entry.split()
     key = sub_entries[0]
-    edges = []
+    
     for sub_entry in sub_entries[1:]:
-        edge = (key, sub_entry)
-        edges.append(edge)
-        edge_dict[key] = edges
+        neighbors[key].append(sub_entry)
+        neighbors[sub_entry].append(key)
 
-print(edge_dict)
+print(neighbors)
+
+for node in nodes:
+    neighbors_str = ','.join([f'node-{n}' for n in neighbors[node]])
+    print(neighbors_str)
 
 
 
