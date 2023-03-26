@@ -90,7 +90,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
                 server_socket.listen(1)
                 print('Listening on port 90 for incoming gossip...')
                 while not self.stop_listening:
-                    server_socket.settimeout(10) 
+                    server_socket.settimeout(3) 
                     try: 
                         conn, addr = server_socket.accept()
                     except socket.timeout:

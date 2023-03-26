@@ -62,4 +62,5 @@ if __name__ == '__main__':
     runner.init_value_history()
     runner.run()
     runner.stop_node_applications()
+    print("Stopping application.")
     sys.exit(0)
