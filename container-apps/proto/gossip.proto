@@ -6,6 +6,7 @@ service Gossip {
   rpc Gossip(GossipRequest) returns (GossipResponse) {}
   rpc History(HistoryRequest) returns (HistoryResponse) {}
   rpc CurrentValue(CurrentValueRequest) returns (CurrentValueResponse) {}
+  rpc StopApplication(StopApplicationRequest) returns (StopApplicationResponse) {}
 }
 
 message GossipRequest {
@@ -21,6 +22,11 @@ message HistoryResponse {
   repeated ValueEntry value_entries = 1;
 }
 
+message ValueEntry {
+  int32 participations = 1;
+  int32 value = 2;
+}
+
 message CurrentValueRequest {
 }
 
@@ -28,7 +34,9 @@ message CurrentValueResponse {
   int32 value = 1;
 }
 
-message ValueEntry {
-  int32 participations = 1;
-  int32 value = 2;
+message StopApplicationRequest {
 }
+
+message StopApplicationResponse {
+}
+

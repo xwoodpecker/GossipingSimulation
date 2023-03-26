@@ -29,6 +29,11 @@ class GossipStub(object):
                 request_serializer=gossip__pb2.CurrentValueRequest.SerializeToString,
                 response_deserializer=gossip__pb2.CurrentValueResponse.FromString,
                 )
+        self.StopApplication = channel.unary_unary(
+                '/gossip.Gossip/StopApplication',
+                request_serializer=gossip__pb2.StopApplicationRequest.SerializeToString,
+                response_deserializer=gossip__pb2.StopApplicationResponse.FromString,
+                )
 
 
 class GossipServicer(object):
@@ -52,6 +57,12 @@ class GossipServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StopApplication(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GossipServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -69,6 +80,11 @@ def add_GossipServicer_to_server(servicer, server):
                     servicer.CurrentValue,
                     request_deserializer=gossip__pb2.CurrentValueRequest.FromString,
                     response_serializer=gossip__pb2.CurrentValueResponse.SerializeToString,
+            ),
+            'StopApplication': grpc.unary_unary_rpc_method_handler(
+                    servicer.StopApplication,
+                    request_deserializer=gossip__pb2.StopApplicationRequest.FromString,
+                    response_serializer=gossip__pb2.StopApplicationResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -128,5 +144,22 @@ class Gossip(object):
         return grpc.experimental.unary_unary(request, target, '/gossip.Gossip/CurrentValue',
             gossip__pb2.CurrentValueRequest.SerializeToString,
             gossip__pb2.CurrentValueResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def StopApplication(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/gossip.Gossip/StopApplication',
+            gossip__pb2.StopApplicationRequest.SerializeToString,
+            gossip__pb2.StopApplicationResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

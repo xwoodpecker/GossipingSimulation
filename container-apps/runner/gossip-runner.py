@@ -46,6 +46,13 @@ class GossipRunner:
             time.sleep(1)
         print(f"The full value history for this run: {self.value_history}")
 
+    def stop_node_applications(self):
+        print(f"Stopping node applications...")
+        for node in self.stub_dict: 
+            response = self.stub_dict[node].StopApplication(gossip_pb2.StopApplicationRequest())
+            print(f"Sent stop application request to node {node}")
+
+
 
 if __name__ == '__main__':
 
@@ -54,3 +61,5 @@ if __name__ == '__main__':
     runner = GossipRunner(nodes)
     runner.init_value_history()
     runner.run()
+    runner.stop_node_applications()
+    sys.exit(0)
