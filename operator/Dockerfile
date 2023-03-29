@@ -4,7 +4,7 @@ FROM python:3.8-slim-buster
 RUN pip install kopf kubernetes
 
 # Copy the operator code to the container
-COPY simple-operator.py /app/operator.py
+COPY simulation-operator.py /app/operator.py
 
 # Set the working directory to /app
 WORKDIR /app

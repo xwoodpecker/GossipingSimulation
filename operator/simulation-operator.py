@@ -6,22 +6,31 @@ import time
 # Load in-cluster configuration
 config.load_incluster_config()
 api = client.CoreV1Api()
+customs_api = client.CustomObjectsApi()
 
-@kopf.on.create('gossip.io', 'v1', 'graphs')
-def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
+@kopf.on.create('gossip.io', 'v1', 'simulations')
+def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
+
+    graph_selector = spec.get('graphSelector', {})
+    match_labels = graph_selector.get('matchLabels', {})
+
+    graph_name = match_labels['app']
+    graph_obj = customs_api.get_namespaced_custom_object('gossip.io', 'v1', namespace, 'graphs', graph_name)
+    graph_spec = graph_obj['spec']
+
+    logger.info(f'Selected graph {graph_name} from graphSelector.')
 
     # Convert the adjacency list from a comma-separated string to a list of tuples
-    str_adj_list = spec.get('adjacencyList', '').rstrip(',')
+    str_adj_list = graph_spec.get('adjacencyList', '').rstrip(',')
     adjacency_list = []
     for edge_str in str_adj_list.split(','):
         if edge_str:
             edge = tuple(map(int, edge_str.strip().split()))
             adjacency_list.append(edge)
+
     logger.info(f'The graph has the adjacency list: {adjacency_list}')
 
-
     entries = [split_str for split_str in str_adj_list.split(',')]
-
     nodes = [entry[0] for entry in entries]
 
     logger.info(f'The graph has the nodes: {nodes}')
@@ -33,30 +42,30 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
     for entry in entries:
         sub_entries = entry.split()
         key = sub_entries[0]
-        
         for sub_entry in sub_entries[1:]:
             neighbors[key].append(sub_entry)
             neighbors[sub_entry].append(key)
 
     logger.info(f'Neighbors of each node: {neighbors}')
 
+    pods = []
+
     def create_pods():
 
         # Create a dictionary to store the Pod names and their node number
-        pod_dictionary = {}
         # Create a Pod for each node in the graph
         for node in nodes:
             # Create a Pod for this node
-            pod_name = f'{name}-node-{node}'
-            pod_dictionary[node] = pod_name
+            pod_name = f'{name}-{graph_name}-node-{node}'
 
             labels = {
                         'app': 'gossip',
-                        'graph': name,
+                        'simulation': name,
+                        'graph': graph_name,
                         'node': str(node)
                     }
             
-            neighbors_str = ','.join([f'{name}-node-{n}' for n in neighbors[node]])
+            neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in neighbors[node]])
             env_var = client.V1EnvVar(name='NEIGHBORS', value=neighbors_str)
 
              # Create the container for the Pod
@@ -83,12 +92,12 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
             )
             try:
                 api.create_namespaced_pod(namespace=namespace, body=pod)
-                logger.info(f'Pod {pod_name} created')
+                logger.info(f'Pod {pod_name} created.')
+                pods.append(pod_name)
             except ApiException as e:
                 logger.error(f'Error creating pod: {e}')
 
-        logger.info(f'Finished creating Pods for graph {name}')
-        return pod_dictionary
+        logger.info(f'Finished creating Pods for simulation {name} on graph {graph_name}.')
 
    
     
@@ -96,17 +105,19 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
 
         for node in nodes:
 
-            service_name = f'{name}-node-{node}'
+            service_name = f'{name}-{graph_name}-node-{node}'
 
             # this does not work I think
             labels = {
                 'app': 'gossip',
-                'graph': name,
+                'simulation': name,
+                'graph': graph_name,
                 'node': str(node)
             }
             selector = {
                 'app': 'gossip',
-                'graph': name,
+                'simulation': name,
+                'graph': graph_name,
                 'node': str(node)
             }
             ports = [
@@ -136,24 +147,25 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
 
             try:
                 api.create_namespaced_service(namespace=namespace, body=service)
-                logger.info(f'Service {service_name} created')
+                logger.info(f'Service {service_name} created.')
             except ApiException as e:
                 logger.error(f'Error creating service: {e}')
 
-        logger.info(f'Finished creating Services for graph {name}')
+        logger.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
 
 
-    def create_runner_pod(pod_dictionary):
+    def create_runner_pod():
 
-        pod_name = f'{name}-simulation-runner'
+        pod_name = f'{name}-runner'
 
         labels = {
                     'app': 'gossip',
-                    'graph': name,
-                    'node': 'simulation-runner'
+                    'simulation': name,
+                    'graph': graph_name,
+                    'node': 'runner'
                 }
         
-        nodes_str = ','.join(pod_dictionary.values())
+        nodes_str = ','.join(pods)
         env_var = client.V1EnvVar(name='NODES', value=nodes_str)
 
         # Create the container for the Pod
@@ -183,22 +195,24 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
         except ApiException as e:
             logger.error(f'Error creating pod: {e}')
 
-        logger.info(f'Finished creating simulation runner pod for graph {name}')
+        logger.info(f'Finished creating simulation runner pod for simulation {name}.')
 
 
     def create_runner_service():
-        service_name = f'{name}-simulation-runner'
 
-        # this does not work I think
+        service_name = f'{name}-runner'
+
         labels = {
             'app': 'gossip',
-            'graph': name,
-            'node': 'simulation-runner'
+            'simulation': name,
+            'graph': graph_name,
+            'node': 'runner'
         }
         selector = {
             'app': 'gossip',
-            'graph': name,
-            'node': 'simulation-runner'
+            'simulation': name,
+            'graph': graph_name,
+            'node': 'runner'
         }
         ports = [
         client.V1ServicePort(
@@ -226,40 +240,27 @@ def create_pods_for_graph(spec, name, namespace, logger, **kwargs):
         except ApiException as e:
             logger.error(f'Error creating service: {e}')
 
-        logger.info(f'Finished creating simulation runner service for graph {name}')
+        logger.info(f'Finished creating simulation runner service for simulation {name}.')
 
     create_services()
-    pod_dict = create_pods()
     create_runner_service()
-    create_runner_pod(pod_dict)
-    logger.info(f'Finished creating Graph {name}')
+    time.sleep(3)
+    create_pods()
+    time.sleep(3)
+    create_runner_pod()
+    logger.info(f'Finished creating resources for simulation {name}.')
 
-
-
-
-## Define a handler function for the cleanup
-#@kopf.on.timer('gossip.io', 'v1', interval=30)
-#def cleanup(namespace, **kwargs):
-#
-#    # Define a function to check if the pods have completed
-#    def check_pods_completion(namespace, pod_dictionary):
-#        completed_pods = []
-#        for node, pod_name in pod_dictionary.items():
-#            try:
-#                pod = api.read_namespaced_pod(pod_name, namespace)
-#                if pod.status.phase == 'Succeeded':
-#                    completed_pods.append(pod_name)
-#            except ApiException as e:
-#                logger.error(f'Error checking pod status: {e}')
-#
-#        # If all pods have completed, perform cleanup
-#        if len(completed_pods) == len(pod_dictionary):
-#            for pod_name in pod_dictionary.values():
-#                try:
-#                    api.delete_namespaced_pod(pod_name, namespace)
-#                    logger.info(f'Pod {pod_name} deleted')
-#                except ApiException as e:
-#                    logger.error(f'Error deleting pod: {e}')
-#                    
-#    # Check if the pods have completed and perform cleanup if necessary
-#    check_pods_com'pletion(namespace, pod_dict)
+@kopf.on.delete('gossip.io', 'v1', 'simulations')
+def delete_services_and_pods(body, **kwargs):
+    simulation_name = body['metadata']['name']
+    namespace = body['metadata']['namespace']
+    
+    # Delete all services with the simulation name label
+    services = api.list_namespaced_service(namespace, label_selector=f"simulation={simulation_name}")
+    for service in services.items:
+        api.delete_namespaced_service(service.metadata.name, namespace)
+        
+    # Delete all pods with the simulation name label
+    pods = api.list_namespaced_pod(namespace, label_selector=f"simulation={simulation_name}")
+    for pod in pods.items:
+        api.delete_namespaced_pod(pod.metadata.name, namespace)

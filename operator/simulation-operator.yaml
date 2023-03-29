@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulation-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simulation-operator
+  template:
+    metadata:
+      labels:
+        app: simulation-operator
+    spec:
+      serviceAccountName: simulation-operator-sa
+      containers:
+        - name: simulation-operator
+          image: xwoodpecker/simulation-operator:latest 

@@ -1,0 +1,9 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: my-simulation
+spec:
+  graphSelector:
+    matchLabels:
+      app: my-graph
+  algorithm: default
