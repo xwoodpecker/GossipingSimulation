@@ -10,4 +10,4 @@ B) add crd for simulation services
 
 C) implement weighted gossiping
  -> detect communities in runner
- -> 
+ -> use very simple approach (higher priority to non-community neighbors)
