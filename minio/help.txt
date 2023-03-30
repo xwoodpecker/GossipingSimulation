@@ -1,0 +1,19 @@
+https://artifacthub.io/packages/helm/bitnami/minio
+
+kubectl get secret --namespace default minio -o jsonpath="{.data.root-user}"
+d:YWRtaW4=
+e:admin
+kubectl get secret --namespace default minio -o jsonpath="{.data.root-password}"
+d:VUxlWjR6Y1lJOQ==
+e:ULeZ4zcYI9
+
+kubectl edit svc my-minio
+change:
+type: NodePort
+add:
+nodePort: 32650
+nodePort: 32651
+
+minikube service minio --url
+http://192.168.178.58:32650
+http://192.168.178.58:32651

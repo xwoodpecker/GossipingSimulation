@@ -1,0 +1,13 @@
+A) complete runner logic
+    1) runner has to receive graph adj list
+    2) runner has to generate graphs as images and store them in object storage
+    3) runner has to store results as json file
+
+B) add crd for simulation services
+ -> specifies repetions of simulations
+ -> can include dynamic graph generation
+ -> different properties have to be implemented
+
+C) implement weighted gossiping
+ -> detect communities in runner
+ -> 
