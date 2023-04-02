@@ -166,13 +166,24 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                 }
         
         nodes_str = ','.join(pods)
-        env_var = client.V1EnvVar(name='NODES', value=nodes_str)
+        
+        env_simulation = client.V1EnvVar(name='SIMULATION', value=name)
+        env_adj_list = client.V1EnvVar(name='ADJ_LIST', value=str_adj_list)
+        env_nodes = client.V1EnvVar(name='NODES', value=nodes_str)
 
         # Create the container for the Pod
         container = client.V1Container(
         name='runner-example',
         image='xwoodpecker/runner-example:latest',
-        env=[env_var],
+        env=[env_simulation, env_adj_list, env_nodes],
+        env_from=[
+            client.V1EnvFromSource(
+                config_map_ref=client.V1ConfigMapEnvSource(name='minio-configmap')
+            ),
+            client.V1EnvFromSource(
+                secret_ref=client.V1SecretEnvSource(name='minio-secrets')
+            )
+        ],
         ports=[
             client.V1ContainerPort(container_port=50051, name='grpc')
         ]

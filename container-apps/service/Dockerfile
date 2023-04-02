@@ -1,4 +1,4 @@
-FROM python:3.7-alpine as base
+FROM python:3.9-alpine as base
 
 RUN apk add --update \
     gcc \
@@ -13,8 +13,10 @@ ENV VIRTUAL_ENV=/opt/venv
 RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# install all requirements
-RUN pip install protobuf grpcio
+# install all requirements 
+RUN pip install -U  --upgrade pip
+COPY requirements.txt /app/requirements.txt
+RUN pip install -r /app/requirements.txt
 
 COPY grpc_compiled /app/grpc_compiled/
 COPY gossip-service.py /app/service.py

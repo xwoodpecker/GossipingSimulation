@@ -1,0 +1,6 @@
+protobuf==4.22.1
+grpcio==1.51.3
+networkx==3.0
+minio==7.1.14
+pygraphviz==1.9
+imageio==2.27.0

@@ -1,85 +1,84 @@
-adj_li = "1 2 4,2 3,3 4,4"
-adj_li = adj_li.rstrip(',')
+import io
+import os
+import random
+from PIL import Image
+import pygal
+from io import BytesIO
+import pygraphviz as pgv
+import networkx as nx
 
-adjacency_list = []
-for edge_str in adj_li.split(','):
-    if edge_str:
-        edge = tuple(map(int, edge_str.strip().split()))
-        adjacency_list.append(edge)
+from minio import Minio
 
+buffer_dict = {}
 
-entries = [split_str for split_str in adj_li.split(',')]
+def plot_graph(graph, num):
+    g = pgv.AGraph(directed=False)
+    for node, data in graph.nodes(data=True):
+        node_color = '#FFFFFF'
+        print('**add_node call**')
+        print(f'node: {node}')
+        print(f"label: <{node}:<b>{data['value']}</b>>")
+        g.add_node(node, style='filled', fillcolor=node_color,
+                   label=f"<{node}:<b>{data['value']}</b>>"
+        )
 
-nodes = [entry[0] for entry in entries]
+    # Add edges to the graph
+    for edge in graph.edges():
+        g.add_edge(edge[0], edge[1])
 
-neighbors = {}
-for node in nodes:
-    neighbors[node] = []
-
-for entry in entries:
-    sub_entries = entry.split()
-    key = sub_entries[0]
-    
-    for sub_entry in sub_entries[1:]:
-        neighbors[key].append(sub_entry)
-        neighbors[sub_entry].append(key)
-
-print(neighbors)
-
-for node in nodes:
-    neighbors_str = ','.join([f'node-{n}' for n in neighbors[node]])
-    print(neighbors_str)
-
-
-
-nodes = [s[0] for s in adj_li.split(',')]
-#print(nodes)
+    # Layout the graph
+    g.layout(prog='dot')
+    # Draw the graph to a byte buffer
+    buffer = io.BytesIO()
+    g.draw(buffer, format='svg')
+    buffer_dict[f'test{num}'] = buffer
 
 
-#for node in nodes:
-    # Find the edges that connect to this node
-    
-    #print(f'Node {node} has edges: {edges}')
 
-edges = []
-for adj in adjacency_list:
-    origin = adj[0]
 
-    es =  ([(origin, neighbor) for neighbor in adj[1:]])
-    if es:
-        edges = edges + es
 
-#print(edges)
 
-name="my-graph"
-pod_dict = {}
-# Create a Pod for each node in the graph
-for node in nodes:
-    # Create a Pod for this node
-    pod_name = f'{name}-node-{node}'
-    pod_dict[node] = pod_name
+adj_list = "1 2 3,2 3,3 4,4 5,5 6 7,6 7,7 8,8"
+g = nx.parse_adjlist(adj_list.split(','))
+for i in range(0,10):
+    for n in g.nodes:
+        g.nodes[n]['value'] = random.randint(0, 10)
+    plot_graph(g, i)
 
-#print(pod_dict)
+# Assume you have an array of SVG bytes buffers named svg_buffers
+# And assume you want to create a 2-second animation with 10 frames
 
-for edge in edges:
-    node1 = pod_dict[str(edge[0])]
-    node2 = pod_dict[str(edge[1])]
 
-    if node1 and node2:
-        service_name = f'{name}-service-{node1}-{node2}'
+# Assume you have an array of SVG bytes buffers named svg_buffers
+# And assume you want to create a 2-second animation with 10 frames
 
-        labels = {
-            'app': 'gossip',
-            'graph': name,
-            'node': str(edge[0])
-        }
+# Create the SVG document
+chart = pygal.XY(width=800, height=600)
 
-        selector = {
-            'app': 'gossip',
-            'graph': name,
-            'node': str(edge[1])
-        }
+# Define the frames
+for i, svg_buffer in buffer_dict.values():
+    chart.add(f"Frame {i}", [(0, 0)])
+    chart.add(f"Frame {i}", [(1, 1)], show_dots=False, show_legend=False)
+    chart.add(f"Frame {i}", [(2, 2)], show_dots=False, show_legend=False)
+    chart.add(f"Frame {i}", [(3, 3)], show_dots=False, show_legend=False)
+    chart.add(f"Frame {i}", [(4, 4)], show_dots=False, show_legend=False)
+    chart.add(f"Frame {i}", [(5, 5)], show_dots=False, show_legend=False)
+    chart.add(f"Frame {i}", [(6, 6)], show_dots=False, show_legend=False)
+    chart.add(f"Frame {i}", [(7, 7)], show_dots=False, show_legend=False)
+    chart.add(f"Frame {i}", [(8, 8)], show_dots=False, show_legend=False)
+    chart.add(f"Frame {i}", [(9, 9)], show_dots=False, show_legend=False)
 
-        #print(edge)
-        #print(labels)
-        #print(selector)
+# Add the animation to the document
+chart.range = (0, 10)
+chart.interpolate = 'cubic'
+chart.duration = 2000
+chart.dynamic_print_values = True
+
+# Render the chart to a byte buffer
+buffer = BytesIO()
+chart.render_to_png(buffer)
+
+# Save the buffer to a file
+with open('./animation.png', 'wb') as f:
+    f.write(buffer.getvalue())
+
