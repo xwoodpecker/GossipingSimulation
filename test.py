@@ -2,7 +2,7 @@ import io
 import os
 import random
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import imageio
 import pygraphviz as pgv
 import networkx as nx
@@ -14,7 +14,7 @@ images = []
 
 
 def plot_graph(graph, num):
-    g = pgv.AGraph(directed=False)
+    g = pgv.AGraph(name=str(num), directed=False)
     for node, data in graph.nodes(data=True):
         node_color = '#FFFFFF'
         g.add_node(node, style='filled', fillcolor=node_color,
@@ -32,7 +32,28 @@ def plot_graph(graph, num):
     g.draw(buffer, format='png')
     buffer_dict[f'test{num}'] = buffer
     img = Image.open(buffer)
-    images.append(img)
+
+    # Add title to the graph image
+    title = f"Round#{num}"
+
+    # Define the font and size for the text
+    font = ImageFont.truetype('arial.ttf', size=18)
+
+    # Create a new image with enough space for the original image and the text below it
+    new_image = Image.new('RGB', (img.width, img.height + 50), color=(255, 255, 255))
+
+    # Paste the original image into the new image
+    new_image.paste(img, (0, 0))
+
+    # Draw the text at the bottom of the new image
+    draw = ImageDraw.Draw(new_image)
+    text_bbox = draw.textbbox((0, img.height, new_image.width, new_image.height), title, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_x = (new_image.width - text_width) / 2
+    text_y = img.height + 10
+    draw.text((text_x, text_y), title, font=font, fill=(0, 0, 0))
+
+    images.append(new_image)
 
 
 
@@ -59,9 +80,9 @@ minio_user = os.environ.get("MINIO_USER")
 minio_password = os.environ.get("MINIO_PASSWORD")
 
 client = Minio(
-        minio_endpoint,
-        access_key=minio_user,
-        secret_key=minio_password,
+        "192.168.178.58:32650",
+        access_key="admin",
+        secret_key="ULeZ4zcYI9",
         secure=False
     )
 

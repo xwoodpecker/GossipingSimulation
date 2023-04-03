@@ -1,7 +1,7 @@
 import os
 import io
 import imageio
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import grpc
 import time
 import datetime
@@ -65,7 +65,6 @@ class GossipRunner:
                 node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
             else:
                 node_color = '#FFFFFF'
-            #label=f"{data['value']}"
             label=f"<{node}:<b>{data['value']}</b>>"
             g.add_node(node, style='filled', fillcolor=node_color, label=label)
 
@@ -79,7 +78,7 @@ class GossipRunner:
         # Draw the graph to a byte buffer
         buffer = io.BytesIO()
         g.draw(buffer, format='png')
-        self.buffer_dict[f'{simulation_name}-round-{round_num}'] = buffer
+        self.buffer_dict[round_num] = buffer
         print(f'Created plot for simulation {simulation_name} in round {round_num}')
 
     def update_graph_node(self, node, value):
@@ -133,7 +132,8 @@ class GossipRunner:
             object_path=f'{simulation_name}-{current_date}'
 
             images = []
-            for object_name, buffer in self.buffer_dict.items():
+            for round_num, buffer in self.buffer_dict.items():
+                object_name = f'{simulation_name}-round-{round_num}'
                 file_size = buffer.getbuffer().nbytes
                 buffer.seek(0)  # Rewind the buffer to the beginning
                 client.put_object(
@@ -145,10 +145,22 @@ class GossipRunner:
                 )
                 print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
                 img = Image.open(buffer)
-                images.append(img)
+                title = f"Round#{round_num}"
+                # Create a new image with enough space for the original image and the text below it
+                new_image = Image.new('RGB', (img.width, img.height + 50), color=(255, 255, 255))
+                # Paste the original image into the new image
+                new_image.paste(img, (0, 0))
+                # Draw the text at the bottom of the new image
+                draw = ImageDraw.Draw(new_image)
+                text_bbox = draw.textbbox((0, img.height, new_image.width, new_image.height), title)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_x = (new_image.width - text_width) / 2
+                text_y = img.height + 10
+                draw.text((text_x, text_y), title, fill=(0, 0, 0))
+                images.append(new_image)
 
             with io.BytesIO() as output:
-                imageio.mimsave(output, images, format='GIF', duration=0.5*len(self.buffer_dict.items()))#
+                imageio.mimsave(output, images, format='GIF', duration=0.5*len(self.buffer_dict.items()))
 
                 # Create another BytesIO instance and write the gif_bytes to it
                 gif_buffer = io.BytesIO(output.getvalue())

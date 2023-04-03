@@ -1,12 +1,5 @@
 A) complete runner logic
-    x 1) runner has to receive graph adj list
-    x 2) runner has to generate graphs as images and store them in object storage
-    x 3) runner has to store results as json file
-    4) runner has to receive graph metadata and add to results (i.e. modularity)
-    x 5) svg animation rendering or fix png rendering 
-    x add font package:
-    x    * font-config + tff-dejavu
-    
+    -> runner has to receive graph metadata and add to results (i.e. modularity)
 
 B) add crd for simulation services
  -> specifies repetitons of simulations
