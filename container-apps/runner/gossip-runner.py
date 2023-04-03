@@ -78,7 +78,7 @@ class GossipRunner:
 
         # Draw the graph to a byte buffer
         buffer = io.BytesIO()
-        g.draw(buffer, format='svg')
+        g.draw(buffer, format='png')
         self.buffer_dict[f'{simulation_name}-round-{round_num}'] = buffer
         print(f'Created plot for simulation {simulation_name} in round {round_num}')
 
@@ -138,38 +138,38 @@ class GossipRunner:
                 buffer.seek(0)  # Rewind the buffer to the beginning
                 client.put_object(
                     "simulations",
-                    f'{object_path}/rounds/{object_name}.svg',
+                    f'{object_path}/rounds/{object_name}.png',
                     buffer,
                     file_size,
-                    content_type="image/svg"
+                    content_type="image/png"
                 )
                 print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
-                #img = Image.open(buffer)
-                #images.append(img)
+                img = Image.open(buffer)
+                images.append(img)
 
-            #with io.BytesIO() as output:
-            #    imageio.mimsave(output, images, format='GIF', duration=0.5*len(self.buffer_dict.items()))#
+            with io.BytesIO() as output:
+                imageio.mimsave(output, images, format='GIF', duration=0.5*len(self.buffer_dict.items()))#
 
                 # Create another BytesIO instance and write the gif_bytes to it
-            #    gif_buffer = io.BytesIO(output.getvalue())
+                gif_buffer = io.BytesIO(output.getvalue())
             
-            #object_name=f'{simulation_name}_visualized'
-            #file_size = len(gif_buffer.getbuffer())
-            #gif_buffer.seek(0)  # Rewind the buffer to the beginning
-            #client.put_object(
-            #    "simulations",
-            #    f'{object_path}/{object_name}',
-            #    gif_buffer,
-            #    file_size,
-            #    content_type="image/gif"
-            #)
-            #print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
+            object_name=f'{simulation_name}_visualized'
+            file_size = len(gif_buffer.getbuffer())
+            gif_buffer.seek(0)  # Rewind the buffer to the beginning
+            client.put_object(
+                "simulations",
+                f'{object_path}/{object_name}.gif',
+                gif_buffer,
+                file_size,
+                content_type="image/gif"
+            )
+            print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
 
             result = Result(self.num_rounds, 'default', adj_list)
             object_name=f'{simulation_name}_summary'
             client.put_object(
                 "simulations",
-                f'{object_path}/{object_name}',
+                f'{object_path}/{object_name}.json',
                 result.to_buffered_reader(),
                 result.file_size(),
                 content_type="application/json",

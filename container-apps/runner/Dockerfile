@@ -7,6 +7,8 @@ RUN apk add --update \
     musl-dev \
     python3-dev \
     libc6-compat \
+    fontconfig \
+    ttf-dejavu \
     graphviz \
     graphviz-dev \
     && rm -rf /var/cache/apk/*
