@@ -24,6 +24,10 @@ spec:
                         type: string
                 algorithm:
                   type: string
+                simulationProperties:
+                  additionalProperties:
+                    type: string
+                  type: object
   scope: Namespaced
   names:
     plural: simulations

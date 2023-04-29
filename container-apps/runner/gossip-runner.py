@@ -21,18 +21,35 @@ sys.path.append("/app/grpc_compiled")
 import gossip_pb2
 import gossip_pb2_grpc
 
+class MinioAccess:
+    def __init__(self, endpoint, user, password):
+        self.endpoint = endpoint
+        self.user = user
+        self.password = password
 
-class GossipRunner:
-    def __init__(self, simulation_name, nodes, graph, node_dict, visualize):
-        self.simulation_name = simulation_name
+class GraphData:
+    def __init__(self, nodes, graph, visualize, graph_properties):
         self.nodes = nodes
         self.graph = graph
-        self.node_dict = node_dict
+         # Regular expression to match the number after the last '-' in the node name
+        pattern = re.compile(r'-(\d+)(?![\d-])')
+        self.node_dict = dict((node_name, re.findall(pattern, node_name)[-1]) for node_name in nodes)
         self.visualize = visualize
+        self.properties = graph_properties
+
+class GossipRunner:
+    def __init__(self, simulation_name, algorithm, graph_data, minio_access):
+        self.simulation_name = simulation_name
+        self.algorithm = algorithm
+        self.graph_data = graph_data
+        # shortcut to nodes
+        self.nodes = graph_data.nodes
+        self.graph = graph_data.graph
         self.stubs = [gossip_pb2_grpc.GossipStub(grpc.insecure_channel(f"{node}:50051")) for node in nodes]
         self.stub_dict = {node: stub for node, stub in zip(nodes, self.stubs)}
         self.buffer_dict = {}
         #print(f"Stubs set to {self.stub_dict}")
+        self.minio_access = minio_access
 
     def plot_graph(self, round_num, num_comm=0):
 
@@ -82,7 +99,7 @@ class GossipRunner:
         print(f'Created plot for simulation {simulation_name} in round {round_num}')
 
     def update_graph_node(self, node, value):
-            graph_node = node_dict[node]
+            graph_node = self.graph_data.node_dict[node]
             self.graph.nodes[graph_node]['value'] = value
 
     
@@ -100,7 +117,7 @@ class GossipRunner:
                     'algorithm': self.algorithm,
                     'adj_list': self.adj_list
                 }
-                if self.metadata is not None:
+                if self.metadata is not None and self.metadata:
                     dict['metadata'] = self.metadata
                 self.json_data = json.dumps(dict)
                         
@@ -115,9 +132,9 @@ class GossipRunner:
         
         try:
             client = Minio(
-                minio_endpoint,
-                access_key=minio_user,
-                secret_key=minio_password,
+                self.minio_access.endpoint,
+                access_key=self.minio_access.user,
+                secret_key=self.minio_access.password,
                 secure=False
             )
 
@@ -177,7 +194,7 @@ class GossipRunner:
             )
             print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
 
-            result = Result(self.num_rounds, 'default', adj_list)
+            result = Result(self.num_rounds, 'default', adj_list, self.graph_data.properties)
             object_name=f'{simulation_name}_summary'
             client.put_object(
                 "simulations",
@@ -199,7 +216,7 @@ class GossipRunner:
             value = int(response.value)
             self.value_history[node] = [(0, value)]
             self.update_graph_node(node, value)
-        if visualize:
+        if self.graph_data.visualize:
             self.plot_graph(0)
 
     def run(self):
@@ -219,7 +236,7 @@ class GossipRunner:
                 print(f"Node {node} has value {value}.")
                 self.value_history[node].append((round_num, value))
                 self.update_graph_node(node, value)
-            if visualize:
+            if self.graph_data.visualize:
                 self.plot_graph(round_num)
             if all(value == values[0] for value in values):
                 print(f"All hosts have converged on value {values[0]}")
@@ -250,9 +267,22 @@ if __name__ == '__main__':
     minio_user = os.environ.get("MINIO_USER")
     minio_password = os.environ.get("MINIO_PASSWORD")
 
+    minioAccess = MinioAccess(minio_endpoint, minio_user, minio_password)
+
     simulation_name = os.environ.get("SIMULATION")
     if simulation_name is None:
         simulation_name = 'unidentified'
+
+    algorithm = os.environ.get("ALGORITHM")
+    if algorithm is None:
+        algorithm = 'default'
+
+    # todo: simulation properties (?)
+    
+    try:
+        graph_properties = json.loads(os.environ.get("GRAPH_PROPERTIES"))
+    except ValueError:
+        graph_properties = {}
 
     adj_list = os.environ.get("ADJ_LIST").rstrip(',')
     graph = create_graph(adj_list)
@@ -260,16 +290,13 @@ if __name__ == '__main__':
     nodes = os.environ.get("NODES").rstrip(',').split(",")
     print(f"Received network nodes: {nodes}")
 
-    # Regular expression to match the number after the last '-' in the node name
-    pattern = re.compile(r'-(\d+)(?![\d-])')
-    # Create a dictionary mapping node names to node numbers
-    node_dict = dict((node_name, re.findall(pattern, node_name)[-1]) for node_name in nodes)
-    
     visualize = os.environ.get("VISUALIZE")
     if visualize is None or not isinstance(visualize, bool):
         visualize = True
 
-    runner = GossipRunner(simulation_name, nodes, graph, node_dict, visualize)
+    graphData = GraphData(nodes, graph, visualize, graph_properties)
+
+    runner = GossipRunner(simulation_name, algorithm, graphData, minioAccess)
     runner.init_value_history()
     runner.run()
     runner.store_results()

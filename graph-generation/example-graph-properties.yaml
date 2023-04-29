@@ -1,0 +1,9 @@
+apiVersion: gossip.io/v1
+kind: Graph
+metadata:
+  name: my-graph-with-properties
+spec:
+  adjacencyList: "1 2 4,2 3,3 4,4,"
+  graphType: "normal"
+  graphProperties:
+    test: "42"

@@ -17,6 +17,14 @@ spec:
               properties:
                 adjacencyList:
                   type: string
+                graphType:
+                  type: string
+                modularity: 
+                  type: string
+                graphProperties:
+                  additionalProperties:
+                    type: string
+                  type: object
   scope: Namespaced
   names:
     plural: graphs

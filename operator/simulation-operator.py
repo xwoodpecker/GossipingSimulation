@@ -2,6 +2,7 @@ import kopf
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 import time
+import json
 
 # Load in-cluster configuration
 config.load_incluster_config()
@@ -153,6 +154,13 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         logger.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
 
+    
+    algorithm = spec.get('algorithm', 'default')
+    simulationProperties = spec.get('simulationProperties', {})
+
+    graphType = graph_spec.get('graphType', 'normal')
+    modularity = graph_spec.get('modularity', None)
+    graphProperties = graph_spec.get('graphProperties', {})
 
     def create_runner_pod():
 
@@ -168,14 +176,29 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         nodes_str = ','.join(pods)
         
         env_simulation = client.V1EnvVar(name='SIMULATION', value=name)
+        env_algorithm = client.V1EnvVar(name='ALGORITHM', value=algorithm)
         env_adj_list = client.V1EnvVar(name='ADJ_LIST', value=str_adj_list)
         env_nodes = client.V1EnvVar(name='NODES', value=nodes_str)
+
+        env_simulation_properties = []
+        for key, value in simulationProperties.items():
+             env_var = client.V1EnvVar(name=key, value=value)
+             env_simulation_properties.append(env_var)
+
+        graph_properties = {}
+        graph_properties['GraphType'] = graphType
+        if modularity:
+            graph_properties['Modularity'] = modularity
+        for key, value in graphProperties.items():
+            graph_properties[key] = value
+        graph_properties_string = json.dumps(graph_properties)
+        env_graph_properties = client.V1EnvVar(name='GRAPH_PROPERTIES', value=graph_properties_string)
 
         # Create the container for the Pod
         container = client.V1Container(
         name='runner-example',
         image='xwoodpecker/runner-example:latest',
-        env=[env_simulation, env_adj_list, env_nodes],
+        env=[env_simulation, env_algorithm, env_adj_list, env_nodes, env_graph_properties] + env_simulation_properties
         env_from=[
             client.V1EnvFromSource(
                 config_map_ref=client.V1ConfigMapEnvSource(name='minio-configmap')

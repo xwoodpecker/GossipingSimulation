@@ -1,11 +1,27 @@
-A) complete runner logic
+<XXX> DONE <XXX>
+    A) complete runner logic
     -> runner has to receive graph metadata and add to results (i.e. modularity)
+    howto:
+        - add extendable properties to graph
+        (examples include graph type, modularity, fixed communities (?))
+        - read properties in operator when a sim is created and hand them to the runner
+        - use them in runner (i.e. add them to results)
+<XXX> DONE <XXX>
+-> ToDo: Verify + Test
 
 B) add crd for simulation services
  -> specifies repetitons of simulations
- -> can include dynamic graph generation
- -> different properties have to be implemented
+ -> can include dynamic graph generation (?)
+    better: develop dynamic graph generation logic that creates graph objects
+    potentially: rest api that creates graph and simulation objects based on inputs
+    simple gui using api to run and inspect simulations (accessing minio)
+ -> different properties have to be implemented 
+    params for the algorithm
 
 C) implement weighted gossiping
  -> detect communities in runner
  -> use very simple approach (higher priority to non-community neighbors)
+
+
+Bugfixing/Refactoring:
+- ENV VISUALIZE (?)
