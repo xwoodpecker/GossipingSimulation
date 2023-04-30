@@ -17,6 +17,15 @@ class ValueEntry:
         self.participations = int(participations)
         self.value = int(value)
 
+class Algorithm:
+    def __init__(self, name):
+        self.name = name
+
+class WeightedV0(Algorithm):
+    def __init__(self, name, community_neighbors, non_community_neighbors):
+        super().__init__(name)
+        self.community_neighbors = community_neighbors
+        self.non_community_neighbors = non_community_neighbors
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
     def __init__(self, name, neighbors, algorithm, stop_event):
@@ -60,16 +69,26 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         print('Finished gossiping.')
 
     def select_neighbor(self):
-        print(f'Selecting neighbor to gossip using algorithm <{self.algorithm}>')
-        if self.algorithm is 'default':
-            neighbor = random.choice(self.neighbors)
-        if self.algorithm is 'weighted_v0':
+        print(f'Selecting neighbor to gossip using algorithm <{self.algorithm.name}>')
+        if self.algorithm.name is 'weighted_v0':
             neighbor = self.weighted_v0()
+        # default and fallback
+        else:
+            neighbor = random.choice(self.neighbors)
         return neighbor
 
-    #TODO implement weighted selection of a neighbor
+    # very simple approach: choosing non-community neighbors twice as likely
     def weighted_v0(self):
-        return None
+        weights = []
+        for neighbor in self.neighbors:
+            if neighbor in self.algorithm.community_neighbors:
+                weight = 1.0
+            else:
+                # prioritize non-community neighbors with a factor of 2
+                weight = 2.0  
+            weights.append(weight)
+        selected = random.choices(self.neighbors, weights=weights)[0]
+        return selected
 
     def Gossip(self, request, context):
         print('[GRPC Gossip invoked]')
@@ -127,9 +146,17 @@ if __name__ == '__main__':
 
     neighbors = os.environ.get("NEIGHBORS").rstrip(',').split(",")
 
-    algorithm = os.environ.get("ALGORITHM")
-    if algorithm is None:
-        algorithm = 'default'
+    algorithm_name = os.environ.get("ALGORITHM")
+    if algorithm_name is None:
+        algorithm_name = 'default'
+
+    if algorithm_name is 'weighted_v0':
+        community_neighbors = os.environ.get("COMMUNITY_NEIGHBORS").rstrip(',').split(",")
+        non_community_neighbors = os.environ.get("NON_COMMUNITY_NEIGHBORS").rstrip(',').split(",")
+        algorithm = WeightedV0(algorithm_name, community_neighbors, non_community_neighbors)
+    # default and fallback case
+    else: 
+        algorithm = Algorithm(algorithm_name)
 
     stop_event = threading.Event()
     service = GossipService(name, neighbors, algorithm, stop_event)
