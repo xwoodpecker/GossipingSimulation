@@ -25,5 +25,10 @@ C) implement weighted gossiping
 <XXX> DONE <XXX>
 -> ToDo: Verify + Test
 
+D) document prototype concept
+- architecture design
+- workflow (seq. diagram?)
+- etc.
+
 Bugfixing/Refactoring:
 - ENV VISUALIZE (?)
