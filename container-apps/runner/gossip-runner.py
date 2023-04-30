@@ -28,14 +28,25 @@ class MinioAccess:
         self.password = password
 
 class GraphData:
-    def __init__(self, nodes, graph, visualize, graph_properties):
+    def __init__(self, nodes, graph, visualize, graph_properties, node_communities=None):
         self.nodes = nodes
         self.graph = graph
-         # Regular expression to match the number after the last '-' in the node name
+        # Regular expression to match the number after the last '-' in the node name
         pattern = re.compile(r'-(\d+)(?![\d-])')
         self.node_dict = dict((node_name, re.findall(pattern, node_name)[-1]) for node_name in nodes)
         self.visualize = visualize
         self.properties = graph_properties
+        # set the community field to the respective id if necessary
+        if node_communities:
+            for node, community_id in node_communities.items():
+                self.graph.nodes[node]['community'] = community_id
+            self.community_ids = set(node_communities.values())
+            self.num_communities = len(self.community_ids)
+        else:
+            self.community_ids = set()
+            self.num_communities = 0
+            
+
 
 class GossipRunner:
     def __init__(self, simulation_name, algorithm, graph_data, minio_access):
@@ -48,8 +59,10 @@ class GossipRunner:
         self.stubs = [gossip_pb2_grpc.GossipStub(grpc.insecure_channel(f"{node}:50051")) for node in nodes]
         self.stub_dict = {node: stub for node, stub in zip(nodes, self.stubs)}
         self.buffer_dict = {}
-        #print(f"Stubs set to {self.stub_dict}")
+        # print(f"Stubs set to {self.stub_dict}")
         self.minio_access = minio_access
+        self.colors = None
+        self.node_colors_set = False
 
     def plot_graph(self, round_num, num_comm=0):
 
@@ -69,21 +82,27 @@ class GossipRunner:
         # Draw the graph using Graphviz
         g = pgv.AGraph(directed=False)
 
-        if num_comm > 0:
-            colors = generate_colors(num_comm)
+        if num_comm > 0 and  self.colors is None:
+            self.colors = generate_colors(num_comm)
 
         # Assign a color to each node based on its community
         community_colors = {}
+        idx = 0
         for node, data in self.graph.nodes(data=True):
-            if num_comm > 0:
-                community_id = data['community']
-                if community_id not in community_colors:
-                    community_colors[community_id] = colors.pop(0)
-                node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
-            else:
-                node_color = '#FFFFFF'
+            if not self.node_colors_set:
+                if num_comm > 0:
+                    community_id = data['community']
+                    if community_id not in community_colors:
+                        community_colors[community_id] = self.colors[idx]
+                        idx += 1
+                    node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
+                else:
+                    node_color = '#FFFFFF'
+                self.graph.nodes[node]['node_color'] = node_color
+                self.node_colors_set = True
+            
             label=f"<{node}:<b>{data['value']}</b>>"
-            g.add_node(node, style='filled', fillcolor=node_color, label=label)
+            g.add_node(node, style='filled', fillcolor=self.graph.nodes[node]['node_color'], label=label)
 
         # Add edges to the graph
         for edge in self.graph.edges():
@@ -217,7 +236,7 @@ class GossipRunner:
             self.value_history[node] = [(0, value)]
             self.update_graph_node(node, value)
         if self.graph_data.visualize:
-            self.plot_graph(0)
+            self.plot_graph(0, self.graph_data.num_communities)
 
     def run(self):
         round_num = 1
@@ -237,7 +256,7 @@ class GossipRunner:
                 self.value_history[node].append((round_num, value))
                 self.update_graph_node(node, value)
             if self.graph_data.visualize:
-                self.plot_graph(round_num)
+                self.plot_graph(round_num, self.graph_data.num_communities)
             if all(value == values[0] for value in values):
                 print(f"All hosts have converged on value {values[0]}")
                 break
@@ -253,7 +272,7 @@ class GossipRunner:
             print(f"Sent stop application request to node {node}")
 
 def create_graph(adj_list):
-    # Read the adjacency list from the file and create a graph
+    # Read the adjacency list and create a graph
     print(f'Creating graph for adjacency list: {adj_list}')
     graph = nx.parse_adjlist(adj_list.split(','))
     print(f'Graph created with nodes: {graph.nodes}')
@@ -277,6 +296,10 @@ if __name__ == '__main__':
     if algorithm is None:
         algorithm = 'default'
 
+    node_communities = None
+    if algorithm is 'weighted_v0':
+        node_communities = os.environ.get("NODE_COMMUNITIES")
+
     # todo: simulation properties (?)
     
     try:
@@ -294,7 +317,7 @@ if __name__ == '__main__':
     if visualize is None or not isinstance(visualize, bool):
         visualize = True
 
-    graphData = GraphData(nodes, graph, visualize, graph_properties)
+    graphData = GraphData(nodes, graph, visualize, graph_properties, node_communities)
 
     runner = GossipRunner(simulation_name, algorithm, graphData, minioAccess)
     runner.init_value_history()

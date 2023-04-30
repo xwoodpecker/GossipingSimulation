@@ -1,8 +1,10 @@
+import time
+import json
 import kopf
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-import time
-import json
+import networkx as nx
+import community as community_louvain
 
 # Load in-cluster configuration
 config.load_incluster_config()
@@ -40,6 +42,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
     for node in nodes:
         neighbors[node] = []
 
+    # Construct neighbors for each node
     for entry in entries:
         sub_entries = entry.split()
         key = sub_entries[0]
@@ -48,6 +51,22 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             neighbors[sub_entry].append(key)
 
     logger.info(f'Neighbors of each node: {neighbors}')
+
+    algorithm = spec.get('algorithm', 'default')
+
+    # comminities are needed for weighted_v0
+    if algorithm is 'weighted_v0':
+        # apply louvain method on the graph
+        graph = nx.parse_adjlist(adjacency_list.split(','))
+        partition = community_louvain.best_partition(graph)
+        # create a dictionary with node ids as keys and community ids as values
+        node_community_dict = {node: community_id for node, community_id in partition.items()}
+        community_node_dict = {}
+        for node, community_id in partition.items():
+            if community_id not in node_community_dict:
+                node_community_dict[community_id] = [node]
+            else:
+                node_community_dict[community_id].append(node)
 
     pods = []
 
@@ -66,14 +85,36 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                         'node': str(node)
                     }
             
+            env = []
+
             neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in neighbors[node]])
-            env_var = client.V1EnvVar(name='NEIGHBORS', value=neighbors_str)
+            env.append(client.V1EnvVar(name='NEIGHBORS', value=neighbors_str))
+            
+            env.append(client.V1EnvVar(name='ALGORITHM', value=algorithm))
+
+            if algorithm is 'weighted_v0':
+                community_id = node_community_dict[node]
+                community_nodes = community_node_dict[community_id]
+                # extract community and non-community neighbors
+                neighbor_nodes = set(neighbors[node])
+                community_neighbors = []
+                non_community_neighbors = []
+                for neighbor_node in neighbor_nodes:
+                    if neighbor_node in community_nodes:
+                        community_neighbors.append(neighbor_node)
+                    else:
+                        non_community_neighbors.append(neighbor_node)
+
+                community_neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in community_neighbors])
+                env.append(client.V1EnvVar(name='COMMUNITY_NEIGHBORS', value=community_neighbors_str))
+                non_community_neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in non_community_neighbors])
+                env.append(client.V1EnvVar(name='NON_COMMUNITY_NEIGHBORS', value=non_community_neighbors_str))
 
              # Create the container for the Pod
             container = client.V1Container(
             name='node-example',
             image='xwoodpecker/node-example:latest',
-            env=[env_var],
+            env=env,
             ports=[
                 client.V1ContainerPort(container_port=90, name='tcp'),
                 client.V1ContainerPort(container_port=50051, name='grpc')
@@ -154,8 +195,6 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         logger.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
 
-    
-    algorithm = spec.get('algorithm', 'default')
     simulationProperties = spec.get('simulationProperties', {})
 
     graphType = graph_spec.get('graphType', 'normal')
@@ -175,15 +214,19 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         
         nodes_str = ','.join(pods)
         
-        env_simulation = client.V1EnvVar(name='SIMULATION', value=name)
-        env_algorithm = client.V1EnvVar(name='ALGORITHM', value=algorithm)
-        env_adj_list = client.V1EnvVar(name='ADJ_LIST', value=str_adj_list)
-        env_nodes = client.V1EnvVar(name='NODES', value=nodes_str)
+        env = []
 
-        env_simulation_properties = []
+        env.append(client.V1EnvVar(name='SIMULATION', value=name))
+        env.append(client.V1EnvVar(name='ALGORITHM', value=algorithm))
+        env.append(client.V1EnvVar(name='ADJ_LIST', value=str_adj_list))
+        env.append(client.V1EnvVar(name='NODES', value=nodes_str))
+
+        if algorithm is 'weighted_v0':
+            node_community_string = json.dumps(node_community_dict)
+            env.append(client.V1EnvVar(name='NODE_COMMUNITIES', value=node_community_string))
+
         for key, value in simulationProperties.items():
-             env_var = client.V1EnvVar(name=key, value=value)
-             env_simulation_properties.append(env_var)
+             env.append(client.V1EnvVar(name=key, value=value))
 
         graph_properties = {}
         graph_properties['GraphType'] = graphType
@@ -192,13 +235,13 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         for key, value in graphProperties.items():
             graph_properties[key] = value
         graph_properties_string = json.dumps(graph_properties)
-        env_graph_properties = client.V1EnvVar(name='GRAPH_PROPERTIES', value=graph_properties_string)
+        env.append(client.V1EnvVar(name='GRAPH_PROPERTIES', value=graph_properties_string))
 
         # Create the container for the Pod
         container = client.V1Container(
         name='runner-example',
         image='xwoodpecker/runner-example:latest',
-        env=[env_simulation, env_algorithm, env_adj_list, env_nodes, env_graph_properties] + env_simulation_properties
+        env=env,
         env_from=[
             client.V1EnvFromSource(
                 config_map_ref=client.V1ConfigMapEnvSource(name='minio-configmap')

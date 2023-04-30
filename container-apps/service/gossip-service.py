@@ -19,9 +19,10 @@ class ValueEntry:
 
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
-    def __init__(self, name, neighbors, stop_event):
+    def __init__(self, name, neighbors, algorithm, stop_event):
         self.name = name
         self.neighbors = neighbors
+        self.algorithm = algorithm
         self._stop_event = stop_event
         self.stop_listening = False
         self.value = random.randint(0, 100)
@@ -45,7 +46,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
 
     def gossip(self):
         print('Starting to gossip.')
-        neighbor = random.choice(self.neighbors)
+        neighbor = self.select_neighbor()
         print(f"Selected neighbor {neighbor} for gossiping.")
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
@@ -56,8 +57,19 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
                 self.process_gossip_data(data)
         except socket.error as e:
             print(f"Socket error occurred: {str(e)}")
-
         print('Finished gossiping.')
+
+    def select_neighbor(self):
+        print(f'Selecting neighbor to gossip using algorithm <{self.algorithm}>')
+        if self.algorithm is 'default':
+            neighbor = random.choice(self.neighbors)
+        if self.algorithm is 'weighted_v0':
+            neighbor = self.weighted_v0()
+        return neighbor
+
+    #TODO implement weighted selection of a neighbor
+    def weighted_v0(self):
+        return None
 
     def Gossip(self, request, context):
         print('[GRPC Gossip invoked]')
@@ -112,10 +124,15 @@ if __name__ == '__main__':
 
     print('Gossip node service started.')
     name = os.environ.get("HOSTNAME")
+
     neighbors = os.environ.get("NEIGHBORS").rstrip(',').split(",")
 
+    algorithm = os.environ.get("ALGORITHM")
+    if algorithm is None:
+        algorithm = 'default'
+
     stop_event = threading.Event()
-    service = GossipService(name, neighbors, stop_event)
+    service = GossipService(name, neighbors, algorithm, stop_event)
     server = grpc.server(futures.ThreadPoolExecutor())
     gossip_pb2_grpc.add_GossipServicer_to_server(service, server)
     server.add_insecure_port('[::]:50051')
