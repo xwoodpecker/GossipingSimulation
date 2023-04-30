@@ -18,10 +18,12 @@ B) add crd for simulation services
  -> different properties have to be implemented 
     params for the algorithm
 
+<XXX> DONE <XXX>
 C) implement weighted gossiping
- -> detect communities in runner
- -> use very simple approach (higher priority to non-community neighbors)
-
+-> detect communities in runner 
+-> use very simple approach (higher priority to non-community neighbors)
+<XXX> DONE <XXX>
+-> ToDo: Verify + Test
 
 Bugfixing/Refactoring:
 - ENV VISUALIZE (?)
