@@ -28,8 +28,17 @@ C) implement weighted gossiping
 
 D) document prototype concept
 - architecture design (simple done)
-- workflow (seq. diagram?) (todo)
+- workflow (seq. diagram?) (done)
 - etc. (?)
 
 Bugfixing/Refactoring:
 - ENV VISUALIZE (?)
+
+Ideas:
+- Weighted Algorithm:
+    * Memory
+    * Probabilities (from comm. detection)
+    * Configurable factor
+- Initialization:
+    * random node values
+    * fixed node values (comparability)
