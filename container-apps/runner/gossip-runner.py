@@ -168,7 +168,7 @@ class GossipRunner:
             current_date = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
             object_path=f'{simulation_name}-{current_date}'
 
-            images = []
+            images = {}
             max_width = 0
             max_height = 0
             for round_num, buffer in self.buffer_dict.items():
@@ -184,28 +184,29 @@ class GossipRunner:
                 )
                 print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
                 img = Image.open(buffer)
-                images.append(img)
+                images[round_num] = img
                 # find  the largest image
                 max_width = max(max_width, img.width)
                 max_height = max(max_height, img.height)
             
-            for img in images:
+            gif_images = []
+            for round_num, image in images.items():
                 title = f"Round#{round_num}"
                 # Create a new image with enough space for the original image and the text below it
                 new_image = Image.new('RGB', (max_width, max_height + 50), color=(255, 255, 255))
                 # Paste the original image into the new image
-                new_image.paste(img, (0, 0))
+                new_image.paste(image, (0, 0))
                 # Draw the text at the bottom of the new image
                 draw = ImageDraw.Draw(new_image)
-                text_bbox = draw.textbbox((0, img.height, new_image.width, new_image.height), title)
+                text_bbox = draw.textbbox((0, image.height, new_image.width, new_image.height), title)
                 text_width = text_bbox[2] - text_bbox[0]
                 text_x = (new_image.width - text_width) / 2
-                text_y = img.height + 10
+                text_y = image.height + 10
                 draw.text((text_x, text_y), title, fill=(0, 0, 0))
-                images.append(new_image)
+                gif_images.append(new_image)
 
             with io.BytesIO() as output:
-                imageio.mimsave(output, images, format='GIF', duration=0.5*len(self.buffer_dict.items()))
+                imageio.mimsave(output, gif_images, format='GIF', duration=0.5*len(self.buffer_dict.items()))
 
                 # Create another BytesIO instance and write the gif_bytes to it
                 gif_buffer = io.BytesIO(output.getvalue())
