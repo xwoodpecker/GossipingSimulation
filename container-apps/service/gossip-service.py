@@ -70,7 +70,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
 
     def select_neighbor(self):
         print(f'Selecting neighbor to gossip using algorithm <{self.algorithm.name}>')
-        if self.algorithm.name is 'weighted_v0':
+        if self.algorithm.name == 'weighted_v0':
             neighbor = self.weighted_v0()
         # default and fallback
         else:
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     if algorithm_name is None:
         algorithm_name = 'default'
 
-    if algorithm_name is 'weighted_v0':
+    if algorithm_name == 'weighted_v0':
         community_neighbors = os.environ.get("COMMUNITY_NEIGHBORS").rstrip(',').split(",")
         non_community_neighbors = os.environ.get("NON_COMMUNITY_NEIGHBORS").rstrip(',').split(",")
         algorithm = WeightedV0(algorithm_name, community_neighbors, non_community_neighbors)

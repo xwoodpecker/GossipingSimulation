@@ -1,0 +1,5 @@
+
+kopf==1.36.0
+kubernetes==26.1.0
+networkx==3.0
+python-louvain==0.16

@@ -13,8 +13,9 @@ B) add crd for simulation services
  -> specifies repetitons of simulations
  -> can include dynamic graph generation (?)
     better: develop dynamic graph generation logic that creates graph objects
-    potentially: rest api that creates graph and simulation objects based on inputs
-    simple gui using api to run and inspect simulations (accessing minio)
+        potentially: rest api that creates graph and simulation objects based on inputs
+        simple gui using api to run and inspect simulations (accessing minio)
+        -> nono focus on crd and stuff !
  -> different properties have to be implemented 
     params for the algorithm
 
@@ -26,9 +27,9 @@ C) implement weighted gossiping
 -> ToDo: Verify + Test
 
 D) document prototype concept
-- architecture design
-- workflow (seq. diagram?)
-- etc.
+- architecture design (simple done)
+- workflow (seq. diagram?) (todo)
+- etc. (?)
 
 Bugfixing/Refactoring:
 - ENV VISUALIZE (?)

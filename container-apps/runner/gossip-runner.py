@@ -45,8 +45,6 @@ class GraphData:
         else:
             self.community_ids = set()
             self.num_communities = 0
-            
-
 
 class GossipRunner:
     def __init__(self, simulation_name, algorithm, graph_data, minio_access):
@@ -61,10 +59,9 @@ class GossipRunner:
         self.buffer_dict = {}
         # print(f"Stubs set to {self.stub_dict}")
         self.minio_access = minio_access
-        self.colors = None
-        self.node_colors_set = False
+        self.init_plot_colors(self.graph_data.num_communities)
 
-    def plot_graph(self, round_num, num_comm=0):
+    def init_plot_colors(self, num_comm=0):
 
         def generate_colors(num_colors):
             colors = []
@@ -77,30 +74,34 @@ class GossipRunner:
                 # Convert the HSV color to an RGB color and append it to the list
                 rgb = tuple(int(255 * x) for x in colorsys.hsv_to_rgb(hue, saturation, brightness))
                 colors.append(rgb)
+            print(f'Generated {num_colors} colors for visualization')
             return colors
         
+        if num_comm > 0:
+            colors = generate_colors(num_comm)
+
+        # Assign a color to each node based on its community
+        idx = 0    
+        community_colors = {}
+        for node, data in self.graph.nodes(data=True):
+            if num_comm > 0:
+                community_id = data['community']
+                if community_id not in community_colors:
+                    community_colors[community_id] = colors[idx]
+                    idx += 1
+                node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
+            else:
+                node_color = '#FFFFFF'
+            self.graph.nodes[node]['node_color'] = node_color
+            print(f'Set node color {node_color} for node {node}')
+        print(f'Node colors set for each node in graph')
+
+
+    def plot_graph(self, round_num, num_comm=0):
         # Draw the graph using Graphviz
         g = pgv.AGraph(directed=False)
 
-        if num_comm > 0 and  self.colors is None:
-            self.colors = generate_colors(num_comm)
-
-        # Assign a color to each node based on its community
-        community_colors = {}
-        idx = 0
         for node, data in self.graph.nodes(data=True):
-            if not self.node_colors_set:
-                if num_comm > 0:
-                    community_id = data['community']
-                    if community_id not in community_colors:
-                        community_colors[community_id] = self.colors[idx]
-                        idx += 1
-                    node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
-                else:
-                    node_color = '#FFFFFF'
-                self.graph.nodes[node]['node_color'] = node_color
-                self.node_colors_set = True
-            
             label=f"<{node}:<b>{data['value']}</b>>"
             g.add_node(node, style='filled', fillcolor=self.graph.nodes[node]['node_color'], label=label)
 
@@ -168,6 +169,8 @@ class GossipRunner:
             object_path=f'{simulation_name}-{current_date}'
 
             images = []
+            max_width = 0
+            max_height = 0
             for round_num, buffer in self.buffer_dict.items():
                 object_name = f'{simulation_name}-round-{round_num}'
                 file_size = buffer.getbuffer().nbytes
@@ -181,9 +184,15 @@ class GossipRunner:
                 )
                 print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
                 img = Image.open(buffer)
+                images.append(img)
+                # find  the largest image
+                max_width = max(max_width, img.width)
+                max_height = max(max_height, img.height)
+            
+            for img in images:
                 title = f"Round#{round_num}"
                 # Create a new image with enough space for the original image and the text below it
-                new_image = Image.new('RGB', (img.width, img.height + 50), color=(255, 255, 255))
+                new_image = Image.new('RGB', (max_width, max_height + 50), color=(255, 255, 255))
                 # Paste the original image into the new image
                 new_image.paste(img, (0, 0))
                 # Draw the text at the bottom of the new image
@@ -297,14 +306,18 @@ if __name__ == '__main__':
         algorithm = 'default'
 
     node_communities = None
-    if algorithm is 'weighted_v0':
-        node_communities = os.environ.get("NODE_COMMUNITIES")
+    if algorithm == 'weighted_v0':
+        try:
+            node_communities = json.loads(os.environ.get("NODE_COMMUNITIES"))
+        except (ValueError, TypeError):
+            node_communities = {}
+
 
     # todo: simulation properties (?)
     
     try:
         graph_properties = json.loads(os.environ.get("GRAPH_PROPERTIES"))
-    except ValueError:
+    except (ValueError, TypeError):
         graph_properties = {}
 
     adj_list = os.environ.get("ADJ_LIST").rstrip(',')

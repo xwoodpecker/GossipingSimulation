@@ -1,0 +1,9 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: my-simulation-weighted
+spec:
+  graphSelector:
+    matchLabels:
+      app: my-graph-with-properties
+  algorithm: weighted_v0

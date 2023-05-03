@@ -25,15 +25,16 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
     # Convert the adjacency list from a comma-separated string to a list of tuples
     str_adj_list = graph_spec.get('adjacencyList', '').rstrip(',')
+    split_adj_list = str_adj_list.split(',')
     adjacency_list = []
-    for edge_str in str_adj_list.split(','):
+    for edge_str in split_adj_list:
         if edge_str:
             edge = tuple(map(int, edge_str.strip().split()))
             adjacency_list.append(edge)
 
     logger.info(f'The graph has the adjacency list: {adjacency_list}')
 
-    entries = [split_str for split_str in str_adj_list.split(',')]
+    entries = [split_str for split_str in split_adj_list]
     nodes = [entry[0] for entry in entries]
 
     logger.info(f'The graph has the nodes: {nodes}')
@@ -53,20 +54,22 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
     logger.info(f'Neighbors of each node: {neighbors}')
 
     algorithm = spec.get('algorithm', 'default')
+    logger.info(f'Simulation running algorithm {algorithm}')
 
     # comminities are needed for weighted_v0
-    if algorithm is 'weighted_v0':
+    if algorithm == 'weighted_v0':
         # apply louvain method on the graph
-        graph = nx.parse_adjlist(adjacency_list.split(','))
+        graph = nx.parse_adjlist(split_adj_list)
         partition = community_louvain.best_partition(graph)
         # create a dictionary with node ids as keys and community ids as values
         node_community_dict = {node: community_id for node, community_id in partition.items()}
         community_node_dict = {}
         for node, community_id in partition.items():
-            if community_id not in node_community_dict:
-                node_community_dict[community_id] = [node]
+            if community_id not in community_node_dict:
+                community_node_dict[community_id] = [node]
             else:
-                node_community_dict[community_id].append(node)
+                community_node_dict[community_id].append(node)   
+        logger.info(f'Node communities: {node_community_dict}')
 
     pods = []
 
@@ -92,7 +95,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             
             env.append(client.V1EnvVar(name='ALGORITHM', value=algorithm))
 
-            if algorithm is 'weighted_v0':
+            if algorithm == 'weighted_v0':
                 community_id = node_community_dict[node]
                 community_nodes = community_node_dict[community_id]
                 # extract community and non-community neighbors
@@ -221,7 +224,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         env.append(client.V1EnvVar(name='ADJ_LIST', value=str_adj_list))
         env.append(client.V1EnvVar(name='NODES', value=nodes_str))
 
-        if algorithm is 'weighted_v0':
+        if algorithm == 'weighted_v0':
             node_community_string = json.dumps(node_community_dict)
             env.append(client.V1EnvVar(name='NODE_COMMUNITIES', value=node_community_string))
 

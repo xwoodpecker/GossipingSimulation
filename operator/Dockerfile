@@ -1,7 +1,10 @@
 FROM python:3.8-slim-buster
 
-# Install dependencies
-RUN pip install kopf kubernetes
+
+# install all requirements 
+RUN pip install -U  --upgrade pip
+COPY requirements.txt /app/requirements.txt
+RUN pip install -r /app/requirements.txt
 
 # Copy the operator code to the container
 COPY simulation-operator.py /app/operator.py
