@@ -1,22 +1,20 @@
 A) 
-- add more logging (json files for round data)
-- Bugfixing/Refactoring: ENV VISUALIZE (?)
-- Initialization:
+- add more logging (json files for round data) (done)
+- Bugfixing/Refactoring: ENV VISUALIZE (done)
+- Initialization: (done)
     * random node values
     * fixed node values (comparability)
+<todo: test>
+
+B1) add repititions to simulation
+<todo: test>
 
 
-B) add crd for simulation services
- -> specifies repetitons of simulations
+B2) add crd for simulation services (?)
  -> can include dynamic graph generation (?)
-    better: develop dynamic graph generation logic that creates graph objects
-        potentially: rest api that creates graph and simulation objects based on inputs
-        simple gui using api to run and inspect simulations (accessing minio)
-        -> nono focus on crd and stuff !
- -> different properties have to be implemented 
-    params for the algorithm
+        -> specify generation <-> simulation configuration and workflow
 
-C)Ideas:
+C) Ideas:
 - Weighted Algorithm:
     * Memory
     * Probabilities (from comm. detection)
@@ -24,3 +22,7 @@ C)Ideas:
 
 D) document 
 
+
+Bugfixing/Refactoring:
+- graph properties still not used in runner container app
+- maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
