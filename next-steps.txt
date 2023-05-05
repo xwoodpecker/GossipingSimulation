@@ -1,13 +1,10 @@
-<XXX> DONE <XXX>
-    A) complete runner logic
-    -> runner has to receive graph metadata and add to results (i.e. modularity)
-    howto:
-        - add extendable properties to graph
-        (examples include graph type, modularity, fixed communities (?))
-        - read properties in operator when a sim is created and hand them to the runner
-        - use them in runner (i.e. add them to results)
-<XXX> DONE <XXX>
--> ToDo: Verify + Test
+A) 
+- add more logging (json files for round data)
+- Bugfixing/Refactoring: ENV VISUALIZE (?)
+- Initialization:
+    * random node values
+    * fixed node values (comparability)
+
 
 B) add crd for simulation services
  -> specifies repetitons of simulations
@@ -19,26 +16,11 @@ B) add crd for simulation services
  -> different properties have to be implemented 
     params for the algorithm
 
-<XXX> DONE <XXX>
-C) implement weighted gossiping
--> detect communities in runner 
--> use very simple approach (higher priority to non-community neighbors)
-<XXX> DONE <XXX>
--> ToDo: Verify + Test
-
-D) document prototype concept
-- architecture design (simple done)
-- workflow (seq. diagram?) (done)
-- etc. (?)
-
-Bugfixing/Refactoring:
-- ENV VISUALIZE (?)
-
-Ideas:
+C)Ideas:
 - Weighted Algorithm:
     * Memory
     * Probabilities (from comm. detection)
     * Configurable factor
-- Initialization:
-    * random node values
-    * fixed node values (comparability)
+
+D) document 
+
