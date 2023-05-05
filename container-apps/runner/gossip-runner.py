@@ -28,7 +28,8 @@ class MinioAccess:
         self.password = password
 
 class GraphData:
-    def __init__(self, nodes, graph, visualize, graph_properties, node_communities=None):
+    def __init__(self, adj_list, nodes, graph, visualize, graph_properties, node_communities=None):
+        self.adj_list = adj_list
         self.nodes = nodes
         self.graph = graph
         # Regular expression to match the number after the last '-' in the node name
@@ -46,10 +47,59 @@ class GraphData:
             self.community_ids = set()
             self.num_communities = 0
 
+
+class Result:
+    def __init__(self, num_rounds, algorithm, adj_list, metadata=None):
+        self.num_rounds = num_rounds
+        self.algorithm = algorithm
+        self.adj_list = adj_list
+        self.metadata = metadata
+        self.buffered_reader = None
+        dict = {
+            'num_rounds': self.num_rounds,
+            'algorithm': self.algorithm,
+            'adj_list': self.adj_list
+        }
+        if self.metadata is not None and self.metadata:
+            dict['metadata'] = self.metadata
+        self.json_data = json.dumps(dict)
+                
+    def to_buffered_reader(self):
+        if self.buffered_reader is None:
+            self.buffered_reader = io.BufferedReader(io.BytesIO(self.json_data.encode()))
+        return self.buffered_reader
+    
+    def file_size(self):
+        json_data_bytes = self.json_data.encode()
+        return len(json_data_bytes)
+
+class NodeValueHistory:
+    def __init__(self):
+        self.dict = {}
+
+    def add(self, round_num, node, value):
+        self.dict['round_num'] = round_num
+        self.dict['round_num'][node] = value
+    
+    def to_buffered_reader(self):
+        if self.json_data is None:
+            self.json_data = json.dumps(dict)
+        if self.buffered_reader is None:
+            self.buffered_reader = io.BufferedReader(io.BytesIO(self.json_data.encode()))
+        return self.buffered_reader
+    
+    def file_size(self):
+        json_data_bytes = self.json_data.encode()
+        return len(json_data_bytes)
+
 class GossipRunner:
-    def __init__(self, simulation_name, algorithm, graph_data, minio_access):
+    def __init__(self, simulation_name, algorithm, repeated, graph_data, minio_access):
         self.simulation_name = simulation_name
         self.algorithm = algorithm
+        self.repeated = repeated
+        if repeated:
+            self.results = []
+            self.run_number = 1
         self.graph_data = graph_data
         # shortcut to nodes
         self.nodes = graph_data.nodes
@@ -60,6 +110,12 @@ class GossipRunner:
         # print(f"Stubs set to {self.stub_dict}")
         self.minio_access = minio_access
         self.init_plot_colors(self.graph_data.num_communities)
+
+    def reset(self):
+        self.buffer_dict = {}
+        for node in self.nodes:
+            print(f"Invoking Reset for node {node}.")
+            response = self.stub_dict[node].Reset(gossip_pb2.ResetRequest())
 
     def init_plot_colors(self, num_comm=0):
 
@@ -125,31 +181,6 @@ class GossipRunner:
     
     def store_results(self):
 
-        class Result:
-            def __init__(self, num_rounds, algorithm, adj_list, metadata=None):
-                self.num_rounds = num_rounds
-                self.algorithm = algorithm
-                self.adj_list = adj_list
-                self.metadata = metadata
-                self.buffered_reader = None
-                dict =  {
-                    'num_rounds': self.num_rounds,
-                    'algorithm': self.algorithm,
-                    'adj_list': self.adj_list
-                }
-                if self.metadata is not None and self.metadata:
-                    dict['metadata'] = self.metadata
-                self.json_data = json.dumps(dict)
-                        
-            def to_buffered_reader(self):
-                if self.buffered_reader is None:
-                    self.buffered_reader = io.BufferedReader(io.BytesIO(self.json_data.encode()))
-                return self.buffered_reader
-            
-            def file_size(self):
-                json_data_bytes = self.json_data.encode()
-                return len(json_data_bytes)
-        
         try:
             client = Minio(
                 self.minio_access.endpoint,
@@ -166,7 +197,14 @@ class GossipRunner:
                 print("Bucket 'simulations' already exists")
 
             current_date = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
-            object_path=f'{simulation_name}-{current_date}'
+            
+            
+            if self.repeated:
+                if self.run_number == 1:
+                    self.simulation_path = object_path=f'{simulation_name}-{current_date}'
+                object_path = self.simulation_path + f'/run-{self.run_number}'
+            else:
+                object_path=f'{simulation_name}-{current_date}'
 
             images = {}
             max_width = 0
@@ -223,7 +261,8 @@ class GossipRunner:
             )
             print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
 
-            result = Result(self.num_rounds, 'default', adj_list, self.graph_data.properties)
+            result = Result(self.num_rounds, self.algorithm, self.graph_data.adj_list, self.graph_data.properties)
+            self.results.append(result)
             object_name=f'{simulation_name}_summary'
             client.put_object(
                 "simulations",
@@ -234,16 +273,60 @@ class GossipRunner:
                 # metadata={"": ""},
             )
             print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
+            
+            object_name=f'{simulation_name}_node_value_history'
+            client.put_object(
+                "simulations",
+                f'{object_path}/{object_name}.json',
+                self.node_value_history.to_buffered_reader(),
+                self.node_value_history.file_size(),
+                content_type="application/json",
+                # metadata={"": ""},
+            )
+            print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
+
+        except S3Error as exc:
+            print("minio error occurred: ", exc)
+        
+    def store_average_results(self):
+        try:
+            client = Minio(
+                self.minio_access.endpoint,
+                access_key=self.minio_access.user,
+                secret_key=self.minio_access.password,
+                secure=False
+            )
+
+            # Make 'simulations' bucket if not exist.
+            found = client.bucket_exists("simulations")
+            if not found:
+                client.make_bucket("simulations")
+            else:
+                print("Bucket 'simulations' already exists")
+
+            object_path=self.simulation_path
+
+            avg_num_rounds = avg_num_rounds = sum(result.num_rounds for result in self.results) / len(self.results)
+            averaged_result = Result(avg_num_rounds, self.algorithm, self.graph_data.adj_list, self.graph_data.properties)
+            object_name=f'{simulation_name}_averaged_result'
+            client.put_object(
+                "simulations",
+                f'{object_path}/{object_name}.json',
+                averaged_result.to_buffered_reader(),
+                averaged_result.file_size(),
+                content_type="application/json",
+                # metadata={"": ""},
+            )
         except S3Error as exc:
             print("minio error occurred: ", exc)
 
 
-    def init_value_history(self):
-        self.value_history = {}
+    def init_node_value_history(self):
+        self.node_value_history = NodeValueHistory()
         for node in self.stub_dict: 
             response = self.stub_dict[node].CurrentValue(gossip_pb2.CurrentValueRequest())
             value = int(response.value)
-            self.value_history[node] = [(0, value)]
+            self.node_value_history.add(0, node, value)
             self.update_graph_node(node, value)
         if self.graph_data.visualize:
             self.plot_graph(0, self.graph_data.num_communities)
@@ -263,7 +346,7 @@ class GossipRunner:
                 value = int(response.value)
                 values.append(value)
                 print(f"Node {node} has value {value}.")
-                self.value_history[node].append((round_num, value))
+                self.node_value_history.add(0, node, value)
                 self.update_graph_node(node, value)
             if self.graph_data.visualize:
                 self.plot_graph(round_num, self.graph_data.num_communities)
@@ -272,7 +355,7 @@ class GossipRunner:
                 break
             round_num += 1
             time.sleep(1)
-        print(f"The full value history for this run: {self.value_history}")
+        print(f"The full value history for this run: {self.node_value_history}")
         self.num_rounds = round_num
 
     def stop_node_applications(self):
@@ -313,6 +396,13 @@ if __name__ == '__main__':
         except (ValueError, TypeError):
             node_communities = {}
 
+    try:
+        repititions = json.loads(os.environ.get("REPITITIONS"))
+    except (ValueError, TypeError):
+        repititions = 1
+    repeated = False
+    if repititions > 1:
+        repeated = True
 
     # todo: simulation properties (?)
     
@@ -327,16 +417,29 @@ if __name__ == '__main__':
     nodes = os.environ.get("NODES").rstrip(',').split(",")
     print(f"Received network nodes: {nodes}")
 
-    visualize = os.environ.get("VISUALIZE")
+    try:
+        visualize = json.loads(os.environ.get("VISUALIZE"))
+    except (ValueError, TypeError):
+        visualize = None
     if visualize is None or not isinstance(visualize, bool):
         visualize = True
 
-    graphData = GraphData(nodes, graph, visualize, graph_properties, node_communities)
+    graphData = GraphData(adj_list, nodes, graph, visualize, graph_properties, node_communities)
 
-    runner = GossipRunner(simulation_name, algorithm, graphData, minioAccess)
-    runner.init_value_history()
+    runner = GossipRunner(simulation_name, algorithm, repeated, graphData, minioAccess)
+    runner.init_node_value_history()
     runner.run()
     runner.store_results()
+
+    # repeat for additional repetitions
+    for i in range(1, repititions):
+        runner.reset()
+        runner.init_node_value_history()
+        runner.run()
+        runner.store_results()
+    if repeated:
+        runner.store_average_results()
+
     runner.stop_node_applications()
     print("Stopping application.")
     sys.exit(0)

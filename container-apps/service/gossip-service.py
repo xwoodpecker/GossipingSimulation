@@ -6,6 +6,7 @@ import socket
 import os
 from concurrent import futures
 import threading
+import json
 
 sys.path.append("/app/grpc_compiled")
 import gossip_pb2
@@ -28,13 +29,17 @@ class WeightedV0(Algorithm):
         self.non_community_neighbors = non_community_neighbors
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
-    def __init__(self, name, neighbors, algorithm, stop_event):
+    def __init__(self, name, neighbors, algorithm, node_value, stop_event):
         self.name = name
         self.neighbors = neighbors
         self.algorithm = algorithm
         self._stop_event = stop_event
         self.stop_listening = False
-        self.value = random.randint(0, 100)
+        if node_value is None:
+            self.value = random.randint(0, 100)
+        else:
+            self.value = node_value
+        self.original_value = self.value
         self.participations = 0
         self.value_entries = []
         self.value_entries.append(ValueEntry(0, self.value))
@@ -89,6 +94,15 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
             weights.append(weight)
         selected = random.choices(self.neighbors, weights=weights)[0]
         return selected
+    
+    def Reset(self, request, context):
+        print('[GRPC Reset invoked]')
+        self.value = self.original_value
+        self.participations = 0
+        self.value_entries = []
+        self.value_entries.append(ValueEntry(0, self.value))
+        print(f'GossipService reset on {self.name} with original value {self.value}.')
+        return gossip_pb2.ResetResponse()
 
     def Gossip(self, request, context):
         print('[GRPC Gossip invoked]')
@@ -150,6 +164,16 @@ if __name__ == '__main__':
     if algorithm_name is None:
         algorithm_name = 'default'
 
+    nodeValue = None
+    try:
+        randomInitialization = json.loads(os.environ.get("RANDOM_INITIALIZATION"))
+    except (ValueError, TypeError):
+        randomInitialization = None
+    if randomInitialization is None or not isinstance(randomInitialization, bool):
+        randomInitialization = True
+    if not randomInitialization:
+        nodeValue = os.environ.get("NODE_VALUE")
+
     if algorithm_name == 'weighted_v0':
         community_neighbors = os.environ.get("COMMUNITY_NEIGHBORS").rstrip(',').split(",")
         non_community_neighbors = os.environ.get("NON_COMMUNITY_NEIGHBORS").rstrip(',').split(",")
@@ -159,7 +183,7 @@ if __name__ == '__main__':
         algorithm = Algorithm(algorithm_name)
 
     stop_event = threading.Event()
-    service = GossipService(name, neighbors, algorithm, stop_event)
+    service = GossipService(name, neighbors, algorithm, nodeValue, stop_event)
     server = grpc.server(futures.ThreadPoolExecutor())
     gossip_pb2_grpc.add_GossipServicer_to_server(service, server)
     server.add_insecure_port('[::]:50051')

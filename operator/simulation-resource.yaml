@@ -24,10 +24,22 @@ spec:
                         type: string
                 algorithm:
                   type: string
+                  default: 'default'
+                repetitions:
+                  type: number
+                  minimum: 1
+                  default: 1
+                randomInitialization:
+                  type: boolean
+                  default: true
+                visualize:
+                  type: boolean
+                  default: false
                 simulationProperties:
                   additionalProperties:
                     type: string
                   type: object
+              required: ['graphSelector']
   scope: Namespaced
   names:
     plural: simulations

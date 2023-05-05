@@ -71,6 +71,20 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                 community_node_dict[community_id].append(node)   
         logger.info(f'Node communities: {node_community_dict}')
 
+    
+    randomInitialization = spec.get('randomInitialization', True)
+    if not randomInitialization:
+        str_value_list = graph_spec.get('valueList', '').rstrip(',')
+        split_value_list = str_value_list.split(',')
+        if len(split_value_list) == len(nodes):
+            values = split_value_list
+        else: 
+            # set the node value to the node number
+            values = nodes
+        node_values = {}
+        for i in range(len(nodes)):
+            node_values[nodes[i]] = values[i]
+
     pods = []
 
     def create_pods():
@@ -94,6 +108,10 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             env.append(client.V1EnvVar(name='NEIGHBORS', value=neighbors_str))
             
             env.append(client.V1EnvVar(name='ALGORITHM', value=algorithm))
+
+            env.append(client.V1EnvVar(name='RANDOM_INITIALIZATION', value=randomInitialization))
+            if not randomInitialization:
+                env.append(client.V1EnvVar(name='NODE_VALUE', value=node_values[node]))
 
             if algorithm == 'weighted_v0':
                 community_id = node_community_dict[node]
@@ -198,6 +216,8 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         logger.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
 
+    repititions = spec.get('repititions', 1)
+    visualize = spec.get('visualize', False)
     simulationProperties = spec.get('simulationProperties', {})
 
     graphType = graph_spec.get('graphType', 'normal')
@@ -221,12 +241,15 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         env.append(client.V1EnvVar(name='SIMULATION', value=name))
         env.append(client.V1EnvVar(name='ALGORITHM', value=algorithm))
+        env.append(client.V1EnvVar(name='REPITITIONS', value=repititions))
         env.append(client.V1EnvVar(name='ADJ_LIST', value=str_adj_list))
         env.append(client.V1EnvVar(name='NODES', value=nodes_str))
 
         if algorithm == 'weighted_v0':
             node_community_string = json.dumps(node_community_dict)
             env.append(client.V1EnvVar(name='NODE_COMMUNITIES', value=node_community_string))
+
+        env.append(client.V1EnvVar(name='VISUALIZE', value=visualize))
 
         for key, value in simulationProperties.items():
              env.append(client.V1EnvVar(name=key, value=value))

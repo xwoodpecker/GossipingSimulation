@@ -3,11 +3,19 @@ syntax = "proto3";
 package gossip;
 
 service Gossip {
+  rpc Reset(ResetRequest) returns (ResetResponse) {}
   rpc Gossip(GossipRequest) returns (GossipResponse) {}
   rpc History(HistoryRequest) returns (HistoryResponse) {}
   rpc CurrentValue(CurrentValueRequest) returns (CurrentValueResponse) {}
   rpc StopApplication(StopApplicationRequest) returns (StopApplicationResponse) {}
 }
+
+message ResetRequest {
+}
+
+message ResetResponse {
+}
+
 
 message GossipRequest {
 }

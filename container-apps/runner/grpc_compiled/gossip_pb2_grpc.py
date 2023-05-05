@@ -14,6 +14,11 @@ class GossipStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.Reset = channel.unary_unary(
+                '/gossip.Gossip/Reset',
+                request_serializer=gossip__pb2.ResetRequest.SerializeToString,
+                response_deserializer=gossip__pb2.ResetResponse.FromString,
+                )
         self.Gossip = channel.unary_unary(
                 '/gossip.Gossip/Gossip',
                 request_serializer=gossip__pb2.GossipRequest.SerializeToString,
@@ -38,6 +43,12 @@ class GossipStub(object):
 
 class GossipServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def Reset(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def Gossip(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -66,6 +77,11 @@ class GossipServicer(object):
 
 def add_GossipServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Reset': grpc.unary_unary_rpc_method_handler(
+                    servicer.Reset,
+                    request_deserializer=gossip__pb2.ResetRequest.FromString,
+                    response_serializer=gossip__pb2.ResetResponse.SerializeToString,
+            ),
             'Gossip': grpc.unary_unary_rpc_method_handler(
                     servicer.Gossip,
                     request_deserializer=gossip__pb2.GossipRequest.FromString,
@@ -95,6 +111,23 @@ def add_GossipServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class Gossip(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Reset(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/gossip.Gossip/Reset',
+            gossip__pb2.ResetRequest.SerializeToString,
+            gossip__pb2.ResetResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def Gossip(request,
