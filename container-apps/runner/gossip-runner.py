@@ -54,43 +54,45 @@ class Result:
         self.algorithm = algorithm
         self.adj_list = adj_list
         self.metadata = metadata
-        self.buffered_reader = None
-        dict = {
+        self.dict = {
             'num_rounds': self.num_rounds,
             'algorithm': self.algorithm,
             'adj_list': self.adj_list
         }
         if self.metadata is not None and self.metadata:
-            dict['metadata'] = self.metadata
-        self.json_data = json.dumps(dict)
+            self.dict['metadata'] = self.metadata
                 
     def to_buffered_reader(self):
-        if self.buffered_reader is None:
-            self.buffered_reader = io.BufferedReader(io.BytesIO(self.json_data.encode()))
-        return self.buffered_reader
+        return io.BufferedReader(io.BytesIO(str(self).encode()))
     
     def file_size(self):
-        json_data_bytes = self.json_data.encode()
+        json_data_bytes = str(self).encode()
         return len(json_data_bytes)
+    
+    def __str__(self):
+        return json.dumps(self.dict, indent=2)
 
 class NodeValueHistory:
     def __init__(self):
-        self.dict = {}
-
+        self.history = []
+    
     def add(self, round_num, node, value):
-        self.dict['round_num'] = round_num
-        self.dict['round_num'][node] = value
+        round_data = next((data for data in self.history if data['round_num'] == round_num), None)
+        if round_data is None:
+            round_data = {'round_num': round_num, 'nodes': {node: value}}
+            self.history.append(round_data)
+        else:
+            round_data['nodes'][node] = value
     
     def to_buffered_reader(self):
-        if self.json_data is None:
-            self.json_data = json.dumps(dict)
-        if self.buffered_reader is None:
-            self.buffered_reader = io.BufferedReader(io.BytesIO(self.json_data.encode()))
-        return self.buffered_reader
+        return io.BufferedReader(io.BytesIO(str(self).encode()))
     
     def file_size(self):
-        json_data_bytes = self.json_data.encode()
+        json_data_bytes = str(self).encode()
         return len(json_data_bytes)
+    
+    def __str__(self):
+        return json.dumps(self.history, indent=2)
 
 class GossipRunner:
     def __init__(self, simulation_name, algorithm, repeated, graph_data, minio_access):
@@ -110,6 +112,10 @@ class GossipRunner:
         # print(f"Stubs set to {self.stub_dict}")
         self.minio_access = minio_access
         self.init_plot_colors(self.graph_data.num_communities)
+
+    def init_next_run(self):
+        self.run_number += 1
+        self.reset()
 
     def reset(self):
         self.buffer_dict = {}
@@ -243,26 +249,28 @@ class GossipRunner:
                 draw.text((text_x, text_y), title, fill=(0, 0, 0))
                 gif_images.append(new_image)
 
-            with io.BytesIO() as output:
-                imageio.mimsave(output, gif_images, format='GIF', duration=0.5*len(self.buffer_dict.items()))
+            if len(gif_images) > 0:
+                with io.BytesIO() as output:
+                    imageio.mimsave(output, gif_images, format='GIF', duration=0.5*len(self.buffer_dict.items()))
 
-                # Create another BytesIO instance and write the gif_bytes to it
-                gif_buffer = io.BytesIO(output.getvalue())
-            
-            object_name=f'{simulation_name}_visualized'
-            file_size = len(gif_buffer.getbuffer())
-            gif_buffer.seek(0)  # Rewind the buffer to the beginning
-            client.put_object(
-                "simulations",
-                f'{object_path}/{object_name}.gif',
-                gif_buffer,
-                file_size,
-                content_type="image/gif"
-            )
-            print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
+                    # Create another BytesIO instance and write the gif_bytes to it
+                    gif_buffer = io.BytesIO(output.getvalue())
+                
+                object_name=f'{simulation_name}_visualized'
+                file_size = len(gif_buffer.getbuffer())
+                gif_buffer.seek(0)  # Rewind the buffer to the beginning
+                client.put_object(
+                    "simulations",
+                    f'{object_path}/{object_name}.gif',
+                    gif_buffer,
+                    file_size,
+                    content_type="image/gif"
+                )
+                print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
 
             result = Result(self.num_rounds, self.algorithm, self.graph_data.adj_list, self.graph_data.properties)
-            self.results.append(result)
+            if self.repeated:
+                self.results.append(result)
             object_name=f'{simulation_name}_summary'
             client.put_object(
                 "simulations",
@@ -326,7 +334,7 @@ class GossipRunner:
         for node in self.stub_dict: 
             response = self.stub_dict[node].CurrentValue(gossip_pb2.CurrentValueRequest())
             value = int(response.value)
-            self.node_value_history.add(0, node, value)
+            self.node_value_history.add(0, self.graph_data.node_dict[node], value)
             self.update_graph_node(node, value)
         if self.graph_data.visualize:
             self.plot_graph(0, self.graph_data.num_communities)
@@ -346,7 +354,7 @@ class GossipRunner:
                 value = int(response.value)
                 values.append(value)
                 print(f"Node {node} has value {value}.")
-                self.node_value_history.add(0, node, value)
+                self.node_value_history.add(round_num, self.graph_data.node_dict[node], value)
                 self.update_graph_node(node, value)
             if self.graph_data.visualize:
                 self.plot_graph(round_num, self.graph_data.num_communities)
@@ -397,12 +405,13 @@ if __name__ == '__main__':
             node_communities = {}
 
     try:
-        repititions = json.loads(os.environ.get("REPITITIONS"))
+        repetitions = json.loads(os.environ.get("REPITITIONS"))
     except (ValueError, TypeError):
-        repititions = 1
+        repetitions = 1
     repeated = False
-    if repititions > 1:
+    if repetitions > 1:
         repeated = True
+        print(f'Repeated execution of simulation for a total of {repetitions} runs')
 
     # todo: simulation properties (?)
     
@@ -415,13 +424,15 @@ if __name__ == '__main__':
     graph = create_graph(adj_list)
 
     nodes = os.environ.get("NODES").rstrip(',').split(",")
+    nodes.sort()
     print(f"Received network nodes: {nodes}")
 
-    try:
-        visualize = json.loads(os.environ.get("VISUALIZE"))
-    except (ValueError, TypeError):
-        visualize = None
-    if visualize is None or not isinstance(visualize, bool):
+    visualize_str = os.environ.get("VISUALIZE")
+    if visualize_str is None:
+        visualize_str = ''
+    if visualize_str.lower() == 'false':
+        visualize = False
+    else:
         visualize = True
 
     graphData = GraphData(adj_list, nodes, graph, visualize, graph_properties, node_communities)
@@ -432,8 +443,9 @@ if __name__ == '__main__':
     runner.store_results()
 
     # repeat for additional repetitions
-    for i in range(1, repititions):
-        runner.reset()
+    for i in range(1, repetitions):
+        print(f'Repeated Run #{i+1} executing...')
+        runner.init_next_run()
         runner.init_node_value_history()
         runner.run()
         runner.store_results()

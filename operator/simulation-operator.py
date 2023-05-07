@@ -36,6 +36,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
     entries = [split_str for split_str in split_adj_list]
     nodes = [entry[0] for entry in entries]
+    nodes.sort()
 
     logger.info(f'The graph has the nodes: {nodes}')
 
@@ -109,9 +110,9 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             
             env.append(client.V1EnvVar(name='ALGORITHM', value=algorithm))
 
-            env.append(client.V1EnvVar(name='RANDOM_INITIALIZATION', value=randomInitialization))
+            env.append(client.V1EnvVar(name='RANDOM_INITIALIZATION', value=str(randomInitialization)))
             if not randomInitialization:
-                env.append(client.V1EnvVar(name='NODE_VALUE', value=node_values[node]))
+                env.append(client.V1EnvVar(name='NODE_VALUE', value=str(node_values[node])))
 
             if algorithm == 'weighted_v0':
                 community_id = node_community_dict[node]
@@ -216,7 +217,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         logger.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
 
-    repititions = spec.get('repititions', 1)
+    repetitions = spec.get('repetitions', 1)
     visualize = spec.get('visualize', False)
     simulationProperties = spec.get('simulationProperties', {})
 
@@ -241,7 +242,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         env.append(client.V1EnvVar(name='SIMULATION', value=name))
         env.append(client.V1EnvVar(name='ALGORITHM', value=algorithm))
-        env.append(client.V1EnvVar(name='REPITITIONS', value=repititions))
+        env.append(client.V1EnvVar(name='REPITITIONS', value=str(repetitions)))
         env.append(client.V1EnvVar(name='ADJ_LIST', value=str_adj_list))
         env.append(client.V1EnvVar(name='NODES', value=nodes_str))
 
@@ -249,7 +250,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             node_community_string = json.dumps(node_community_dict)
             env.append(client.V1EnvVar(name='NODE_COMMUNITIES', value=node_community_string))
 
-        env.append(client.V1EnvVar(name='VISUALIZE', value=visualize))
+        env.append(client.V1EnvVar(name='VISUALIZE', value=str(visualize)))
 
         for key, value in simulationProperties.items():
              env.append(client.V1EnvVar(name=key, value=value))

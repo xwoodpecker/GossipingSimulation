@@ -1,15 +1,3 @@
-A) 
-- add more logging (json files for round data) (done)
-- Bugfixing/Refactoring: ENV VISUALIZE (done)
-- Initialization: (done)
-    * random node values
-    * fixed node values (comparability)
-<todo: test>
-
-B1) add repititions to simulation
-<todo: test>
-
-
 B2) add crd for simulation services (?)
  -> can include dynamic graph generation (?)
         -> specify generation <-> simulation configuration and workflow
@@ -21,7 +9,6 @@ C) Ideas:
     * Configurable factor
 
 D) document 
-
 
 Bugfixing/Refactoring:
 - graph properties still not used in runner container app

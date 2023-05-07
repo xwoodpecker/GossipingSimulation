@@ -38,7 +38,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         if node_value is None:
             self.value = random.randint(0, 100)
         else:
-            self.value = node_value
+            self.value = int(node_value)
         self.original_value = self.value
         self.participations = 0
         self.value_entries = []
@@ -165,11 +165,12 @@ if __name__ == '__main__':
         algorithm_name = 'default'
 
     nodeValue = None
-    try:
-        randomInitialization = json.loads(os.environ.get("RANDOM_INITIALIZATION"))
-    except (ValueError, TypeError):
-        randomInitialization = None
-    if randomInitialization is None or not isinstance(randomInitialization, bool):
+    randomInitialization_str = os.environ.get("RANDOM_INITIALIZATION")
+    if randomInitialization_str is None:
+        randomInitialization_str = ''
+    if randomInitialization_str.lower() == 'false':
+        randomInitialization = False
+    else:
         randomInitialization = True
     if not randomInitialization:
         nodeValue = os.environ.get("NODE_VALUE")
