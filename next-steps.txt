@@ -4,12 +4,14 @@ B2) add crd for simulation services (?)
 
 C) Ideas:
 - Weighted Algorithm:
-    * Memory
+    * Memory (todo: test)
     * Probabilities (from comm. detection)
-    * Configurable factor
+    * Configurable factor (todo: test)
 
 D) document 
 
 Bugfixing/Refactoring:
-- graph properties still not used in runner container app
+- simulation properties still not used in runner container app
+(done -> todo: test)
 - maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
+- can refactor algorithm as standalone custom  (?)
