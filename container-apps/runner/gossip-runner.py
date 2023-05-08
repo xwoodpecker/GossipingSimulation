@@ -27,6 +27,11 @@ class MinioAccess:
         self.user = user
         self.password = password
 
+class AlgorithmData:
+    def __init__(self, name, simulation_properties):
+        self.name = name
+        self.properties = simulation_properties
+
 class GraphData:
     def __init__(self, adj_list, nodes, graph, visualize, graph_properties, node_communities=None):
         self.adj_list = adj_list
@@ -49,18 +54,21 @@ class GraphData:
 
 
 class Result:
-    def __init__(self, num_rounds, algorithm, adj_list, metadata=None):
+    def __init__(self, num_rounds, algorithm_data, adj_list, graph_metadata=None):
         self.num_rounds = num_rounds
-        self.algorithm = algorithm
+        self.algorithm = algorithm_data.name
+        self.simulation_properties = algorithm_data.properties
         self.adj_list = adj_list
-        self.metadata = metadata
+        self.graph_metadata = graph_metadata
         self.dict = {
             'num_rounds': self.num_rounds,
             'algorithm': self.algorithm,
             'adj_list': self.adj_list
         }
-        if self.metadata is not None and self.metadata:
-            self.dict['metadata'] = self.metadata
+        if self.graph_metadata is not None and self.graph_metadata:
+            self.dict['graph_metadata'] = self.graph_metadata
+        if self.simulation_properties is not None and self.simulation_properties:
+            self.dict['algorithm_metadata'] = self.simulation_properties
                 
     def to_buffered_reader(self):
         return io.BufferedReader(io.BytesIO(str(self).encode()))
@@ -95,9 +103,10 @@ class NodeValueHistory:
         return json.dumps(self.history, indent=2)
 
 class GossipRunner:
-    def __init__(self, simulation_name, algorithm, repeated, graph_data, minio_access):
+    def __init__(self, simulation_name, algorithm_data, repeated, graph_data, minio_access):
         self.simulation_name = simulation_name
-        self.algorithm = algorithm
+        self.algorithm_data = algorithm_data
+        self.algorithm = algorithm_data.name
         self.repeated = repeated
         if repeated:
             self.results = []
@@ -268,7 +277,7 @@ class GossipRunner:
                 )
                 print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
 
-            result = Result(self.num_rounds, self.algorithm, self.graph_data.adj_list, self.graph_data.properties)
+            result = Result(self.num_rounds, self.algorithm_data, self.graph_data.adj_list, self.graph_data.properties)
             if self.repeated:
                 self.results.append(result)
             object_name=f'{simulation_name}_summary'
@@ -315,7 +324,7 @@ class GossipRunner:
             object_path=self.simulation_path
 
             avg_num_rounds = avg_num_rounds = sum(result.num_rounds for result in self.results) / len(self.results)
-            averaged_result = Result(avg_num_rounds, self.algorithm, self.graph_data.adj_list, self.graph_data.properties)
+            averaged_result = Result(avg_num_rounds, self.algorithm_data, self.graph_data.adj_list, self.graph_data.properties)
             object_name=f'{simulation_name}_averaged_result'
             client.put_object(
                 "simulations",
@@ -398,7 +407,7 @@ if __name__ == '__main__':
         algorithm = 'default'
 
     node_communities = None
-    if algorithm == 'weighted_v0':
+    if algorithm == 'weighted_factor':
         try:
             node_communities = json.loads(os.environ.get("NODE_COMMUNITIES"))
         except (ValueError, TypeError):
@@ -413,7 +422,12 @@ if __name__ == '__main__':
         repeated = True
         print(f'Repeated execution of simulation for a total of {repetitions} runs')
 
-    # todo: simulation properties (?)
+    try:
+        simulation_properties = json.loads(os.environ.get("SIMULATION_PROPERTIES"))
+    except (ValueError, TypeError):
+        simulation_properties = {}
+
+    algorithmData = AlgorithmData(algorithm, simulation_properties)
     
     try:
         graph_properties = json.loads(os.environ.get("GRAPH_PROPERTIES"))
@@ -437,7 +451,7 @@ if __name__ == '__main__':
 
     graphData = GraphData(adj_list, nodes, graph, visualize, graph_properties, node_communities)
 
-    runner = GossipRunner(simulation_name, algorithm, repeated, graphData, minioAccess)
+    runner = GossipRunner(simulation_name, algorithmData, repeated, graphData, minioAccess)
     runner.init_node_value_history()
     runner.run()
     runner.store_results()

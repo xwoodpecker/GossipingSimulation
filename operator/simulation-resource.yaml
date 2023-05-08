@@ -35,6 +35,8 @@ spec:
                 visualize:
                   type: boolean
                   default: false
+                factor:
+                  type: number
                 simulationProperties:
                   additionalProperties:
                     type: string

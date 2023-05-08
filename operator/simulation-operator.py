@@ -57,8 +57,8 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
     algorithm = spec.get('algorithm', 'default')
     logger.info(f'Simulation running algorithm {algorithm}')
 
-    # comminities are needed for weighted_v0
-    if algorithm == 'weighted_v0':
+    # comminities are needed for weighted_factor
+    if algorithm == 'weighted_factor' or algorithm == 'weighted_factor_memory':
         # apply louvain method on the graph
         graph = nx.parse_adjlist(split_adj_list)
         partition = community_louvain.best_partition(graph)
@@ -71,6 +71,11 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             else:
                 community_node_dict[community_id].append(node)   
         logger.info(f'Node communities: {node_community_dict}')
+    
+        factor = spec.get('factor', 1.5)
+
+        if algorithm == 'weighted_factor_memory':
+            prior_partner_factor = spec.get('priorPartnerFactor', 0.5)
 
     
     randomInitialization = spec.get('randomInitialization', True)
@@ -114,23 +119,27 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             if not randomInitialization:
                 env.append(client.V1EnvVar(name='NODE_VALUE', value=str(node_values[node])))
 
-            if algorithm == 'weighted_v0':
+            if algorithm == 'weighted_factor' or algorithm == 'weighted_factor_memory':
                 community_id = node_community_dict[node]
                 community_nodes = community_node_dict[community_id]
                 # extract community and non-community neighbors
                 neighbor_nodes = set(neighbors[node])
                 community_neighbors = []
-                non_community_neighbors = []
+                #non_community_neighbors = []
                 for neighbor_node in neighbor_nodes:
                     if neighbor_node in community_nodes:
                         community_neighbors.append(neighbor_node)
-                    else:
-                        non_community_neighbors.append(neighbor_node)
+                    #else:
+                    #    non_community_neighbors.append(neighbor_node)
 
                 community_neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in community_neighbors])
                 env.append(client.V1EnvVar(name='COMMUNITY_NEIGHBORS', value=community_neighbors_str))
-                non_community_neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in non_community_neighbors])
-                env.append(client.V1EnvVar(name='NON_COMMUNITY_NEIGHBORS', value=non_community_neighbors_str))
+                #non_community_neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in non_community_neighbors])
+                #env.append(client.V1EnvVar(name='NON_COMMUNITY_NEIGHBORS', value=non_community_neighbors_str))
+                env.append(client.V1EnvVar(name='FACTOR', value=str(factor)))
+
+                if algorithm == 'weighted_factor_memory':
+                    env.append(client.V1EnvVar(name='PRIOR_PARTNER_FACTOR', value=str(prior_partner_factor)))
 
              # Create the container for the Pod
             container = client.V1Container(
@@ -246,21 +255,20 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         env.append(client.V1EnvVar(name='ADJ_LIST', value=str_adj_list))
         env.append(client.V1EnvVar(name='NODES', value=nodes_str))
 
-        if algorithm == 'weighted_v0':
+        if algorithm == 'weighted_factor' or algorithm == 'weighted_factor_memory':
             node_community_string = json.dumps(node_community_dict)
             env.append(client.V1EnvVar(name='NODE_COMMUNITIES', value=node_community_string))
 
         env.append(client.V1EnvVar(name='VISUALIZE', value=str(visualize)))
 
-        for key, value in simulationProperties.items():
-             env.append(client.V1EnvVar(name=key, value=value))
+        simulation_properties = simulationProperties.copy()
+        simulation_properties_string = json.dumps(simulation_properties)
+        env.append(client.V1EnvVar(name='SIMULATION_PROPERTIES', value=simulation_properties_string))
 
-        graph_properties = {}
+        graph_properties = graphProperties.copy()
         graph_properties['GraphType'] = graphType
         if modularity:
             graph_properties['Modularity'] = modularity
-        for key, value in graphProperties.items():
-            graph_properties[key] = value
         graph_properties_string = json.dumps(graph_properties)
         env.append(client.V1EnvVar(name='GRAPH_PROPERTIES', value=graph_properties_string))
 

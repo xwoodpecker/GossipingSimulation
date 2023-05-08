@@ -19,19 +19,58 @@ class ValueEntry:
         self.value = int(value)
 
 class Algorithm:
-    def __init__(self, name):
-        self.name = name
-
-class WeightedV0(Algorithm):
-    def __init__(self, name, community_neighbors, non_community_neighbors):
-        super().__init__(name)
-        self.community_neighbors = community_neighbors
-        self.non_community_neighbors = non_community_neighbors
-
-class GossipService(gossip_pb2_grpc.GossipServicer):
-    def __init__(self, name, neighbors, algorithm, node_value, stop_event):
+    def __init__(self, name, neighbors):
         self.name = name
         self.neighbors = neighbors
+        print(f"Running algorithm: {self.name}.")
+        print(f"Received neighbors: {self.neighbors}.")
+    
+    def select_neighbor(self):
+        return random.choice(self.neighbors)
+
+class WeightedFactor(Algorithm):
+    def __init__(self, name, neighbors, community_neighbors, factor):
+        super().__init__(name, neighbors)
+        self.community_neighbors = community_neighbors
+        self.factor = factor
+    
+    def select_neighbor(self):
+        weights = []
+        for neighbor in self.neighbors:
+            if neighbor in self.community_neighbors:
+                weight = 1.0
+            else:
+                # prioritize non-community neighbors with a given factor
+                weight = self.algorithm.factor 
+            weights.append(weight)
+        selected = random.choices(self.neighbors, weights=weights)[0]
+        return selected
+
+class WeightedFactorMemory(WeightedFactor):
+    def __init__(self,  name, neighbors, community_neighbors, factor, prior_partner_factor):
+        super().__init__(name, neighbors, community_neighbors, factor)
+        self.prior_partner_factor = prior_partner_factor
+        self.memory = set()
+
+        def select_neighbor(self):            
+            weights = []
+            for neighbor in self.neighbors:
+                if neighbor in self.community_neighbors:
+                    weight = 1.0
+                else:
+                    # prioritize non-community neighbors with a given factor
+                    weight = self.factor
+                if neighbor in self.memory:
+                    weight *= self.prior_partner_factor
+                weights.append(weight)
+            
+            selected = random.choices(self.neighbors, weights=weights)[0]
+            self.memory.add(selected)  # Remember the selected neighbor
+            return selected
+
+class GossipService(gossip_pb2_grpc.GossipServicer):
+    def __init__(self, name, algorithm, node_value, stop_event):
+        self.name = name
         self.algorithm = algorithm
         self._stop_event = stop_event
         self.stop_listening = False
@@ -44,7 +83,6 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         self.value_entries = []
         self.value_entries.append(ValueEntry(0, self.value))
         print(f'GossipService initialized on {self.name} with value {self.value}.')
-        print(f"Received neighbors: {self.neighbors}")
         # Start the listen_for_connections method in a background thread
         self.listen_thread = threading.Thread(target=self.listen_for_connections)
         self.listen_thread.start()
@@ -60,8 +98,8 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
 
     def gossip(self):
         print('Starting to gossip.')
-        neighbor = self.select_neighbor()
-        print(f"Selected neighbor {neighbor} for gossiping.")
+        neighbor = self.algorithm.select_neighbor()
+        print(f'Selecting neighbor {neighbor} to gossip using algorithm {self.algorithm.name}.')
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
                 client_socket.connect((neighbor, 90))
@@ -72,28 +110,6 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         except socket.error as e:
             print(f"Socket error occurred: {str(e)}")
         print('Finished gossiping.')
-
-    def select_neighbor(self):
-        print(f'Selecting neighbor to gossip using algorithm <{self.algorithm.name}>')
-        if self.algorithm.name == 'weighted_v0':
-            neighbor = self.weighted_v0()
-        # default and fallback
-        else:
-            neighbor = random.choice(self.neighbors)
-        return neighbor
-
-    # very simple approach: choosing non-community neighbors twice as likely
-    def weighted_v0(self):
-        weights = []
-        for neighbor in self.neighbors:
-            if neighbor in self.algorithm.community_neighbors:
-                weight = 1.0
-            else:
-                # prioritize non-community neighbors with a factor of 2
-                weight = 2.0  
-            weights.append(weight)
-        selected = random.choices(self.neighbors, weights=weights)[0]
-        return selected
     
     def Reset(self, request, context):
         print('[GRPC Reset invoked]')
@@ -175,16 +191,39 @@ if __name__ == '__main__':
     if not randomInitialization:
         nodeValue = os.environ.get("NODE_VALUE")
 
-    if algorithm_name == 'weighted_v0':
+    def init_default_algorithm():
+        return Algorithm(algorithm_name, neighbors)
+
+    def init_communities_and_factor():
         community_neighbors = os.environ.get("COMMUNITY_NEIGHBORS").rstrip(',').split(",")
-        non_community_neighbors = os.environ.get("NON_COMMUNITY_NEIGHBORS").rstrip(',').split(",")
-        algorithm = WeightedV0(algorithm_name, community_neighbors, non_community_neighbors)
-    # default and fallback case
-    else: 
-        algorithm = Algorithm(algorithm_name)
+        #non_community_neighbors = os.environ.get("NON_COMMUNITY_NEIGHBORS").rstrip(',').split(",")
+        try:
+            factor = float(os.environ.get("FACTOR"))
+        except ValueError:
+            factor = 1.5
+        return community_neighbors, factor
+
+    def init_weighted_factor():
+        community_neighbors, factor = init_communities_and_factor()
+        return WeightedFactor(algorithm_name, neighbors, community_neighbors, factor)
+    
+    def init_weighted_factor_memory():
+        community_neighbors, factor = init_communities_and_factor()
+        try:
+            prior_partner_factor = float(os.environ.get("PRIOR_PARTNER_FACTOR"))
+        except ValueError:
+            prior_partner_factor = 0.5
+        return WeightedFactorMemory(algorithm_name, neighbors, community_neighbors, factor, prior_partner_factor) 
+    
+    def init_algorithm(name):
+        algorithms = {
+            'weighted_factor': init_weighted_factor,
+            'weighted_factor_memory': init_weighted_factor_memory
+        }
+        return algorithms.get(name, init_default_algorithm)
 
     stop_event = threading.Event()
-    service = GossipService(name, neighbors, algorithm, nodeValue, stop_event)
+    service = GossipService(name, neighbors, init_algorithm(algorithm_name), nodeValue, stop_event)
     server = grpc.server(futures.ThreadPoolExecutor())
     gossip_pb2_grpc.add_GossipServicer_to_server(service, server)
     server.add_insecure_port('[::]:50051')
