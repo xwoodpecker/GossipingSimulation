@@ -407,7 +407,7 @@ if __name__ == '__main__':
         algorithm = 'default'
 
     node_communities = None
-    if algorithm == 'weighted_factor':
+    if algorithm in ('weighted_factor', 'weighted_factor_memory'):
         try:
             node_communities = json.loads(os.environ.get("NODE_COMMUNITIES"))
         except (ValueError, TypeError):
