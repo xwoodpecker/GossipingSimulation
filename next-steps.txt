@@ -1,17 +1,27 @@
 B2) add crd for simulation services (?)
  -> can include dynamic graph generation (?)
         -> specify generation <-> simulation configuration and workflow
+        -> rest api for graph / (simulation) object creation?
+        -> cleanup graph generation 
+        -> graph generation should be as dynamic as possible
+        -> add modular graph creation rountine (github project)
 
-C) Ideas:
-- Weighted Algorithm:
-    * Memory (todo: test)
-    * Probabilities (from comm. detection)
-    * Configurable factor (todo: test)
+xxx
+xxx C) Ideas:
+xxx - Weighted Algorithm:
+xxx     * Memory (todo: test)
+xxx     * Probabilities (from comm. detection)
+xxx     * Configurable factor (todo: test)
+xxx
 
 D) document 
 
 Bugfixing/Refactoring:
-- simulation properties still not used in runner container app
-(done -> todo: test)
+xxx
+xxx - simulation properties still not used in runner container app
+xxx done -> todo: test
+xxx
 - maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
 - can refactor algorithm as standalone custom  (?)
+- refactor all strings/globalvars in one shared class
+- print node communities in json file as output 

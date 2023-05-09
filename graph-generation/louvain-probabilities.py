@@ -33,4 +33,9 @@ for node, cluster_probs in probabilities.items():
     print(f"Node {node}:")
     for cluster, prob in cluster_probs.items():
         print(f"Cluster {cluster}: {prob}") 
-    print(f'Louvain Cluster: {partition[node]}')
+    #print(f'Louvain Cluster: {partition[node]}')
+
+cluster_probs = probabilities["5"]
+print(cluster_probs)
+test = cluster_probs[0]
+print(test)

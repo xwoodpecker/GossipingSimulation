@@ -56,12 +56,8 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
     algorithm = spec.get('algorithm', 'default')
     logger.info(f'Simulation running algorithm {algorithm}')
-
-    # comminities are needed for weighted_factor
-    if algorithm == 'weighted_factor' or algorithm == 'weighted_factor_memory':
-        # apply louvain method on the graph
-        graph = nx.parse_adjlist(split_adj_list)
-        partition = community_louvain.best_partition(graph)
+    
+    def get_community_node_dict(partition):
         # create a dictionary with node ids as keys and community ids as values
         node_community_dict = {node: community_id for node, community_id in partition.items()}
         community_node_dict = {}
@@ -71,12 +67,41 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             else:
                 community_node_dict[community_id].append(node)   
         logger.info(f'Node communities: {node_community_dict}')
-    
-        factor = spec.get('factor', 1.5)
+        return node_community_dict, community_node_dict
 
-        if algorithm == 'weighted_factor_memory':
+    # comminities are needed for weighted_factor and community probability assignment
+    if algorithm in ('weighted_factor', 'weighted_factor_memory', 'community_probabilities', 'community_probabilities_memory'):
+        graph = nx.parse_adjlist(split_adj_list)
+        # apply louvain method on the graph
+        partition = community_louvain.best_partition(graph)
+        node_community_dict, community_node_dict = get_community_node_dict(partition)
+
+        if algorithm in ('weighted_factor', 'weighted_factor_memory'):
+            factor = spec.get('factor', 1.5)
+
+        if algorithm in ('community_probabilities', 'community_probabilities_memory'):
+            # Compute the cluster sizes
+            cluster_sizes = {}
+            for node, cluster in partition.items():
+                if cluster not in cluster_sizes:
+                    cluster_sizes[cluster] = 0
+                cluster_sizes[cluster] += 1
+
+            # Compute the community_probabilities for each cluster for each node
+            community_probabilities = {}
+            for node, cluster in partition.items():
+                if node not in community_probabilities:
+                    community_probabilities[node] = {}
+                neighbors = graph.neighbors(node)
+                neighbor_count = len(list(graph.neighbors(node)))
+                for neighbor in neighbors:
+                    neighbor_cluster = partition[neighbor]
+                    if neighbor_cluster not in community_probabilities[node]:
+                        community_probabilities[node][neighbor_cluster] = 0
+                    community_probabilities[node][neighbor_cluster] += 1 / neighbor_count
+
+        if algorithm.endswith('_memory'):
             prior_partner_factor = spec.get('priorPartnerFactor', 0.5)
-
     
     randomInitialization = spec.get('randomInitialization', True)
     if not randomInitialization:
@@ -119,7 +144,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             if not randomInitialization:
                 env.append(client.V1EnvVar(name='NODE_VALUE', value=str(node_values[node])))
 
-            if algorithm == 'weighted_factor' or algorithm == 'weighted_factor_memory':
+            if algorithm in ('weighted_factor', 'weighted_factor_memory'):
                 community_id = node_community_dict[node]
                 community_nodes = community_node_dict[community_id]
                 # extract community and non-community neighbors
@@ -138,8 +163,20 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                 #env.append(client.V1EnvVar(name='NON_COMMUNITY_NEIGHBORS', value=non_community_neighbors_str))
                 env.append(client.V1EnvVar(name='FACTOR', value=str(factor)))
 
-                if algorithm == 'weighted_factor_memory':
-                    env.append(client.V1EnvVar(name='PRIOR_PARTNER_FACTOR', value=str(prior_partner_factor)))
+            if algorithm in ('community_probabilities', 'community_probabilities_memory'):
+                community_id = node_community_dict[node]
+                neighbor_nodes = set(neighbors[node])
+
+                same_community_probabilities_neighbors = []
+                for neighbor in neighbor_nodes:
+                    neighbor_community_probabilities = community_probabilities[neighbor]
+                    same_community_probabilities_neighbors.append(neighbor_community_probabilities[community_id])
+                
+                same_community_probabilities_neighbors_str = ','.join(same_community_probabilities_neighbors)
+                env.append(client.V1EnvVar(name='SAME_COMMUNITY_PROBABILITIES_NEIGHBORS', value=same_community_probabilities_neighbors_str))
+
+            if algorithm.endswith('_memory'):
+                env.append(client.V1EnvVar(name='PRIOR_PARTNER_FACTOR', value=str(prior_partner_factor)))
 
              # Create the container for the Pod
             container = client.V1Container(
@@ -255,7 +292,8 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         env.append(client.V1EnvVar(name='ADJ_LIST', value=str_adj_list))
         env.append(client.V1EnvVar(name='NODES', value=nodes_str))
 
-        if algorithm == 'weighted_factor' or algorithm == 'weighted_factor_memory':
+        # set for graph highlighting in plots
+        if algorithm in ('weighted_factor', 'weighted_factor_memory', 'community_probabilities', 'community_probabilities_memory'):
             node_community_string = json.dumps(node_community_dict)
             env.append(client.V1EnvVar(name='NODE_COMMUNITIES', value=node_community_string))
 
