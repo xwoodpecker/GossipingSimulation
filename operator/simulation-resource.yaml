@@ -37,6 +37,8 @@ spec:
                   default: false
                 factor:
                   type: number
+                priorPartnerFactor:
+                  type: number
                 simulationProperties:
                   additionalProperties:
                     type: string

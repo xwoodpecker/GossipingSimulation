@@ -41,9 +41,8 @@ class WeightedFactor(Algorithm):
                 weight = 1.0
             else:
                 # prioritize non-community neighbors with a given factor
-                weight = self.algorithm.factor 
+                weight = self.factor 
             weights.append(weight)
-        print(f'DEBUG: weights before choice {weights}')
         selected = random.choices(self.neighbors, weights=weights)[0]
         return selected
 
@@ -53,30 +52,31 @@ class WeightedFactorMemory(WeightedFactor):
         self.prior_partner_factor = prior_partner_factor
         self.memory = set()
 
-        def select_neighbor(self):            
-            weights = []
-            for neighbor in self.neighbors:
-                if neighbor in self.community_neighbors:
-                    weight = 1.0
-                else:
-                    # prioritize non-community neighbors with a given factor
-                    weight = self.factor
-                if neighbor in self.memory:
-                    weight *= self.prior_partner_factor
-                weights.append(weight)
-            print(f'DEBUG: weights before choice {weights}')
-            selected = random.choices(self.neighbors, weights=weights)[0]
-            self.memory.add(selected)  # Remember the selected neighbor
-            return selected
+    def select_neighbor(self):            
+        weights = []
+        for neighbor in self.neighbors:
+            if neighbor in self.community_neighbors:
+                weight = 1.0
+            else:
+                # prioritize non-community neighbors with a given factor
+                weight = self.factor
+            if neighbor in self.memory:
+                weight *= self.prior_partner_factor
+            weights.append(weight)
+        print(f'DEBUG: weights before choice {weights}')
+        selected = random.choices(self.neighbors, weights=weights)[0]
+        self.memory.add(selected)  # Remember the selected neighbor
+        return selected
         
 class CommunityProbabilities(Algorithm):
     def __init__(self, name, neighbors, same_community_probabilities_neighbors):
         super().__init__(name, neighbors)
         self.same_community_probabilities_neighbors = same_community_probabilities_neighbors
+        self.inverted_probabilities = [1 / x for x in same_community_probabilities_neighbors]
 
     def select_neighbor(self):
-        print(f'DEBUG: weights before choice {self.same_community_probabilities_neighbors}')
-        selected = random.choices(self.neighbors, weights=self.same_community_probabilities_neighbors)[0]
+        print(f'DEBUG: weights before choice {self.inverted_probabilities}')
+        selected = random.choices(self.neighbors, weights=self.inverted_probabilities)[0]
         return selected
 
 class CommunityProbabilitiesMemory(CommunityProbabilities):
@@ -85,18 +85,18 @@ class CommunityProbabilitiesMemory(CommunityProbabilities):
         self.prior_partner_factor = prior_partner_factor
         self.memory = set()
 
-        def select_neighbor(self):
-            weights = []
-            for i in range(0, len(neighbors)):
-                neighbor = neighbors[i]
-                weight = same_community_probabilities_neighbors[i]
-                if neighbor in self.memory:
-                    weight *= self.prior_partner_factor
-                weights.append(weight)
-            print(f'DEBUG: weights before choice {weights}')
-            selected = random.choices(self.neighbors, weights=weights)[0]
-            self.memory.add(selected)  # Remember the selected neighbor
-            return selected
+    def select_neighbor(self):
+        weights = []
+        for i in range(0, len(neighbors)):
+            neighbor = neighbors[i]
+            weight = self.inverted_probabilities[i]
+            if neighbor in self.memory:
+                weight *= self.prior_partner_factor
+            weights.append(weight)
+        print(f'DEBUG: weights before choice {weights}')
+        selected = random.choices(self.neighbors, weights=weights)[0]
+        self.memory.add(selected)  # Remember the selected neighbor
+        return selected
 
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
@@ -223,7 +223,7 @@ if __name__ == '__main__':
         nodeValue = os.environ.get("NODE_VALUE")
 
     def init_default_algorithm():
-        return Algorithm(algorithm_name, neighbors)
+        return Algorithm('default', neighbors)
 
     def init_communities_and_factor():
         community_neighbors = os.environ.get("COMMUNITY_NEIGHBORS").rstrip(',').split(",")
@@ -232,13 +232,22 @@ if __name__ == '__main__':
             factor = float(os.environ.get("FACTOR"))
         except ValueError:
             factor = 1.5
+        print(f'Community neighbors set to {community_neighbors}')
+        print(f'Factor set to {factor}')
         return community_neighbors, factor
+    
+    def init_same_community_probabilities_neighbors():
+        same_community_probabilities_neighbors_str = os.environ.get("SAME_COMMUNITY_PROBABILITIES_NEIGHBORS")
+        same_community_probabilities_neighbors = [float(item) for item in same_community_probabilities_neighbors_str.rstrip(',').split(",")]
+        print(f'Same community probabilities set to {same_community_probabilities_neighbors}')
+        return same_community_probabilities_neighbors
     
     def init_memory():
         try:
             prior_partner_factor = float(os.environ.get("PRIOR_PARTNER_FACTOR"))
         except ValueError:
             prior_partner_factor = 0.5
+        print(f'Prior partner factor set to {prior_partner_factor}')
         return prior_partner_factor
 
     def init_weighted_factor():
@@ -251,25 +260,27 @@ if __name__ == '__main__':
         return WeightedFactorMemory(algorithm_name, neighbors, community_neighbors, factor, prior_partner_factor) 
     
     def init_community_probabilities():
-        same_community_probabilities_neighbors = os.environ.get("SAME_COMMUNITY_PROBABILITIES_NEIGHBORS").rstrip(',').split(",")
+        same_community_probabilities_neighbors = init_same_community_probabilities_neighbors()
         return CommunityProbabilities(algorithm_name, neighbors, same_community_probabilities_neighbors)
     
     def init_community_probabilities_memory():
-        same_community_probabilities_neighbors = os.environ.get("SAME_COMMUNITY_PROBABILITIES_NEIGHBORS").rstrip(',').split(",")
+        same_community_probabilities_neighbors = init_same_community_probabilities_neighbors()
         prior_partner_factor = init_memory()
         return CommunityProbabilitiesMemory(algorithm_name, neighbors, same_community_probabilities_neighbors, prior_partner_factor)
 
     def init_algorithm(name):
-        algorithms = {
+        init_funcs = {
             'weighted_factor': init_weighted_factor,
             'weighted_factor_memory': init_weighted_factor_memory,
             'community_probabilities': init_community_probabilities,
             'community_probabilities_memory' :  init_community_probabilities_memory
         }
-        return algorithms.get(name, init_default_algorithm)
+        init_func = init_funcs.get(name, init_default_algorithm)
+        algorithm = init_func()
+        return algorithm
 
     stop_event = threading.Event()
-    service = GossipService(name, neighbors, init_algorithm(algorithm_name), nodeValue, stop_event)
+    service = GossipService(name, init_algorithm(algorithm_name), nodeValue, stop_event)
     server = grpc.server(futures.ThreadPoolExecutor())
     gossip_pb2_grpc.add_GossipServicer_to_server(service, server)
     server.add_insecure_port('[::]:50051')

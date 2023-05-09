@@ -51,6 +51,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         for sub_entry in sub_entries[1:]:
             neighbors[key].append(sub_entry)
             neighbors[sub_entry].append(key)
+    neighbors = {key: sorted(values) for key, values in sorted(neighbors.items())}
 
     logger.info(f'Neighbors of each node: {neighbors}')
 
@@ -92,9 +93,8 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             for node, cluster in partition.items():
                 if node not in community_probabilities:
                     community_probabilities[node] = {}
-                neighbors = graph.neighbors(node)
-                neighbor_count = len(list(graph.neighbors(node)))
-                for neighbor in neighbors:
+                neighbor_count = len(list(neighbors[node]))
+                for neighbor in neighbors[node]:
                     neighbor_cluster = partition[neighbor]
                     if neighbor_cluster not in community_probabilities[node]:
                         community_probabilities[node][neighbor_cluster] = 0
@@ -165,14 +165,18 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
             if algorithm in ('community_probabilities', 'community_probabilities_memory'):
                 community_id = node_community_dict[node]
-                neighbor_nodes = set(neighbors[node])
+                neighbor_nodes = neighbors[node]
 
                 same_community_probabilities_neighbors = []
                 for neighbor in neighbor_nodes:
                     neighbor_community_probabilities = community_probabilities[neighbor]
                     same_community_probabilities_neighbors.append(neighbor_community_probabilities[community_id])
                 
-                same_community_probabilities_neighbors_str = ','.join(same_community_probabilities_neighbors)
+                same_community_probabilities_neighbors_str = ','.join(
+                    str(round(item, 4)) 
+                    for item 
+                    in same_community_probabilities_neighbors
+                )
                 env.append(client.V1EnvVar(name='SAME_COMMUNITY_PROBABILITIES_NEIGHBORS', value=same_community_probabilities_neighbors_str))
 
             if algorithm.endswith('_memory'):

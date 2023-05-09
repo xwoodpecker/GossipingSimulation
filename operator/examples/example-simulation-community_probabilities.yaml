@@ -1,0 +1,15 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: my-simulation-weighted
+spec:
+  graphSelector:
+    matchLabels:
+      app: my-graph-with-properties
+  algorithm: community_probabilities
+  repetitions: 1
+  visualize: true
+  randomInitialization: false
+  simulationProperties:
+    test: "42"
+    anotherTest: "123"

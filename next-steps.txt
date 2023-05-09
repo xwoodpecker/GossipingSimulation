@@ -13,6 +13,7 @@ xxx     * Memory (todo: test)
 xxx     * Probabilities (from comm. detection)
 xxx     * Configurable factor (todo: test)
 xxx
+todo: test prob with memory
 
 D) document 
 
@@ -25,3 +26,7 @@ xxx
 - can refactor algorithm as standalone custom  (?)
 - refactor all strings/globalvars in one shared class
 - print node communities in json file as output 
+- memory alg: add incoming gossips to memory
+- refactor sleep (faster runtime)
+- gifs with more rounds are reaaaaaally slow (too fast with not many rounds)
+- advanced memory alg. -> count number of interactions (further multiplications)
