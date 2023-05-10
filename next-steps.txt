@@ -18,15 +18,16 @@ todo: test prob with memory
 D) document 
 
 Bugfixing/Refactoring:
-xxx
-xxx - simulation properties still not used in runner container app
-xxx done -> todo: test
-xxx
-- maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
-- can refactor algorithm as standalone custom  (?)
+*Prio A
+xxx - print node communities in json file as output 
+xxx - memory alg: add incoming gossips to memory
+xxx - refactor sleep (faster runtime) -> instead wait til all node pods are running ()
+xxx - gifs with more rounds are reaaaaaally slow (too fast with not many rounds)
+xxx todo:  test 
+*Prio B
 - refactor all strings/globalvars in one shared class
-- print node communities in json file as output 
-- memory alg: add incoming gossips to memory
-- refactor sleep (faster runtime)
-- gifs with more rounds are reaaaaaally slow (too fast with not many rounds)
 - advanced memory alg. -> count number of interactions (further multiplications)
+ also: reset memory when own value changes
+*Prio C
+- maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
+- can refactor algorithm as standalone custom resource (?)
