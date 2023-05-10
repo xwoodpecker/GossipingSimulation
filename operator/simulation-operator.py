@@ -398,10 +398,27 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
     create_services()
     create_runner_service()
-    time.sleep(3)
     create_pods()
-    time.sleep(3)
+    
+    labels = {
+            'app': 'gossip',
+            'simulation': name,
+            'graph': graph_name
+        }
+
+    while True:
+        # List all pods matching the specified labels
+        pods = api.list_namespaced_pod(namespace=namespace,
+                                        label_selector=','.join([f"{k}={v}" for k, v in labels.items()]))
+
+        # Check if all pods are in the "Running" state
+        if all(pod.status.phase == 'Running' for pod in pods.items):
+            break  # All pods are running, exit the loop
+        time.sleep(1)  # Wait for 1 second before checking again
+
+    # All pods are running, create the runner pod
     create_runner_pod()
+    
     logger.info(f'Finished creating resources for simulation {name}.')
 
 @kopf.on.delete('gossip.io', 'v1', 'simulations')

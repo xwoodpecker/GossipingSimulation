@@ -48,6 +48,7 @@ class GraphData:
                 self.graph.nodes[node]['community'] = community_id
             self.community_ids = set(node_communities.values())
             self.num_communities = len(self.community_ids)
+            self.properties['nodeCommunities'] = json.dumps(node_communities, indent=2)
         else:
             self.community_ids = set()
             self.num_communities = 0
@@ -260,7 +261,9 @@ class GossipRunner:
 
             if len(gif_images) > 0:
                 with io.BytesIO() as output:
-                    imageio.mimsave(output, gif_images, format='GIF', duration=0.5*len(self.buffer_dict.items()))
+                    # number of  frames
+                    frames_per_second = len(gif_images)/2
+                    imageio.mimsave(output, gif_images, format='GIF', fps=frames_per_second)
 
                     # Create another BytesIO instance and write the gif_bytes to it
                     gif_buffer = io.BytesIO(output.getvalue())
@@ -355,7 +358,7 @@ class GossipRunner:
             for node in self.stub_dict:
                 print(f"Invoking Gossiping for node {node}.")
                 response = self.stub_dict[node].Gossip(gossip_pb2.GossipRequest())
-                time.sleep(1)
+                #time.sleep(1)
             print(f"Round {round_num} of gossiping ended. Printing results.")
             values = []
             for node in self.stub_dict:
@@ -371,7 +374,7 @@ class GossipRunner:
                 print(f"All hosts have converged on value {values[0]}")
                 break
             round_num += 1
-            time.sleep(1)
+            time.sleep(0.5)
         print(f"The full value history for this run: {self.node_value_history}")
         self.num_rounds = round_num
 

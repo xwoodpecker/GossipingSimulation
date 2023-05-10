@@ -67,6 +67,9 @@ class WeightedFactorMemory(WeightedFactor):
         selected = random.choices(self.neighbors, weights=weights)[0]
         self.memory.add(selected)  # Remember the selected neighbor
         return selected
+    
+    def remember(self, neighbor):
+        self.memory.add(neighbor)
         
 class CommunityProbabilities(Algorithm):
     def __init__(self, name, neighbors, same_community_probabilities_neighbors):
@@ -97,7 +100,9 @@ class CommunityProbabilitiesMemory(CommunityProbabilities):
         selected = random.choices(self.neighbors, weights=weights)[0]
         self.memory.add(selected)  # Remember the selected neighbor
         return selected
-
+    
+    def remember(self, neighbor):
+        self.memory.add(neighbor)
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
     def __init__(self, name, algorithm, node_value, stop_event):
@@ -120,11 +125,14 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
 
     def process_gossip_data(self, data):
         self.participations += 1
-        peer_value = int(data.decode('utf-8'))
-        print(f"Received peer value: {peer_value}, Current value: {self.value}")
+        peer_name, peer_value = data.decode('utf-8').split(':')
+        print(f"Received peer value: {peer_value} from {peer_name}")
+        print(f"Current value: {self.value}")
         self.value = min(self.value, peer_value)
         print(f"Value after gossiping: {self.value}")
         self.value_entries.append(ValueEntry(self.participations, self.value))
+        if isinstance(self.algorithm, (WeightedFactorMemory, CommunityProbabilitiesMemory)):
+            self.algorithm.remember(peer_name)
 
 
     def gossip(self):
@@ -134,7 +142,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
                 client_socket.connect((neighbor, 90))
-                client_socket.sendall(bytes(str(self.value), 'utf-8'))
+                client_socket.sendall(bytes('f{self.name}:{self.value}', 'utf-8'))
                 print(f"Sent {self.value} over TCP socket.")
                 data = client_socket.recv(1024)
                 self.process_gossip_data(data)
@@ -192,7 +200,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
                         # Process incoming data
                         data = conn.recv(1024)
                         self.process_gossip_data(data)
-                        conn.sendall(bytes(str(self.value), 'utf-8'))
+                        conn.sendall(bytes('{self.name}:{self.value}', 'utf-8'))
                         print(f"Responded with value of {self.value} over TCP socket.")
                     finally:
                         conn.close()
