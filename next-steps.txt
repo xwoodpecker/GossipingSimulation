@@ -15,6 +15,13 @@ xxx     * Configurable factor (todo: test)
 xxx
 todo: test prob with memory
 
+todo add algorithms:
+- baseline simple memory
+- baseline adv memory
+- weighted factor adv memory
+- comm. prob. adv memory
+
+
 D) document 
 
 Bugfixing/Refactoring:
@@ -25,9 +32,14 @@ xxx - refactor sleep (faster runtime) -> instead wait til all node pods are runn
 xxx - gifs with more rounds are reaaaaaally slow (too fast with not many rounds)
 xxx todo:  test 
 *Prio B
-- refactor all strings/globalvars in one shared class
+xxx - refactor all strings/globalvars in one shared class
+TODO: test dockerfiles
 - advanced memory alg. -> count number of interactions (further multiplications)
  also: reset memory when own value changes
 *Prio C
 - maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
 - can refactor algorithm as standalone custom resource (?)
+- refactor classes / subclasses (move to separated files)
+- refactor weights -> constantly updated instead of re-computed always
+*Prio d
+- add comments to lots of stuff

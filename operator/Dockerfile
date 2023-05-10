@@ -6,6 +6,8 @@ RUN pip install -U  --upgrade pip
 COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
+# Copy the config to the container
+COPY ../shared/cfg.py /app/cfg.py
 # Copy the operator code to the container
 COPY simulation-operator.py /app/operator.py
 

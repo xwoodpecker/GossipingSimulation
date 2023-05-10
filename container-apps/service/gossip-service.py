@@ -11,6 +11,7 @@ import json
 sys.path.append("/app/grpc_compiled")
 import gossip_pb2
 import gossip_pb2_grpc
+from cfg import *
 
 
 class ValueEntry:
@@ -65,11 +66,48 @@ class WeightedFactorMemory(WeightedFactor):
             weights.append(weight)
         print(f'DEBUG: weights before choice {weights}')
         selected = random.choices(self.neighbors, weights=weights)[0]
-        self.memory.add(selected)  # Remember the selected neighbor
+        # Moved assignment to process_gossip_data
+        # self.memory.add(selected)  # Remember the selected neighbor
         return selected
     
     def remember(self, neighbor):
         self.memory.add(neighbor)
+
+        
+class WeightedFactorComplexMemory(WeightedFactor):
+
+    def __init__(self,  name, neighbors, community_neighbors, factor, prior_partner_factor):
+        super().__init__(name, neighbors, community_neighbors, factor)
+        self.prior_partner_factor = prior_partner_factor
+        self.memory = dict()
+        for neighbor in neighbors:
+            self.memory[neighbor] = 0
+
+    def select_neighbor(self):            
+        weights = []
+        for neighbor in self.neighbors:
+            if neighbor in self.community_neighbors:
+                weight = 1.0
+            else:
+                # prioritize non-community neighbors with a given factor
+                weight = self.factor
+            if self.memory[neighbor] > 0:
+                weight *= (self.prior_partner_factor * self.memory[neighbor])
+            weights.append(weight)
+        print(f'DEBUG: weights before choice {weights}')
+        selected = random.choices(self.neighbors, weights=weights)[0]
+        # Moved assignment to process_gossip_data
+        # self.memory[selected] += 1
+        return selected
+    
+    def remember(self, neighbor):
+        # Remember interaction with the selected neighbor
+        self.memory[neighbor] += 1
+
+    def reset_memory(self):
+        for neighbor in neighbors:
+            self.memory[neighbor] = 0
+
         
 class CommunityProbabilities(Algorithm):
     def __init__(self, name, neighbors, same_community_probabilities_neighbors):
@@ -98,7 +136,8 @@ class CommunityProbabilitiesMemory(CommunityProbabilities):
             weights.append(weight)
         print(f'DEBUG: weights before choice {weights}')
         selected = random.choices(self.neighbors, weights=weights)[0]
-        self.memory.add(selected)  # Remember the selected neighbor
+        # Moved assignment to process_gossip_data
+        # self.memory.add(selected)  # Remember the selected neighbor 
         return selected
     
     def remember(self, neighbor):
@@ -128,8 +167,14 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         peer_name, peer_value = data.decode('utf-8').split(':')
         print(f"Received peer value: {peer_value} from {peer_name}")
         print(f"Current value: {self.value}")
+        old_value = self.value
         self.value = min(self.value, peer_value)
-        print(f"Value after gossiping: {self.value}")
+        if old_value == self.value:
+            print(f"Value was not changed")
+        else:
+            print(f"New value after gossiping: {self.value}")
+            if isinstance(self.algorithm, WeightedFactorComplexMemory):
+                self.algorithm.reset_memory()
         self.value_entries.append(ValueEntry(self.participations, self.value))
         if isinstance(self.algorithm, (WeightedFactorMemory, CommunityProbabilitiesMemory)):
             self.algorithm.remember(peer_name)
@@ -141,10 +186,10 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         print(f'Selecting neighbor {neighbor} to gossip using algorithm {self.algorithm.name}.')
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                client_socket.connect((neighbor, 90))
+                client_socket.connect((neighbor, TCP_SERVICE_PORT))
                 client_socket.sendall(bytes('f{self.name}:{self.value}', 'utf-8'))
                 print(f"Sent {self.value} over TCP socket.")
-                data = client_socket.recv(1024)
+                data = client_socket.recv(TCP_BUFSIZE)
                 self.process_gossip_data(data)
         except socket.error as e:
             print(f"Socket error occurred: {str(e)}")
@@ -186,9 +231,9 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
     def listen_for_connections(self):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-                server_socket.bind((self.name, 90))
+                server_socket.bind((self.name, TCP_SERVICE_PORT))
                 server_socket.listen(1)
-                print('Listening on port 90 for incoming gossip...')
+                print(f'Listening on port {TCP_SERVICE_PORT} for incoming gossip...')
                 while not self.stop_listening:
                     server_socket.settimeout(3) 
                     try: 
@@ -198,7 +243,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
                     try:
                         print(f'Gossiping request accepted from {addr[0]}:{addr[1]}')
                         # Process incoming data
-                        data = conn.recv(1024)
+                        data = conn.recv(TCP_BUFSIZE)
                         self.process_gossip_data(data)
                         conn.sendall(bytes('{self.name}:{self.value}', 'utf-8'))
                         print(f"Responded with value of {self.value} over TCP socket.")
@@ -211,16 +256,16 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
 if __name__ == '__main__':
 
     print('Gossip node service started.')
-    name = os.environ.get("HOSTNAME")
+    name = os.environ.get(ENVIRONMENT_HOSTNAME)
 
-    neighbors = os.environ.get("NEIGHBORS").rstrip(',').split(",")
+    neighbors = os.environ.get(ENVIRONMENT_NEIGHBORS).rstrip(',').split(",")
 
-    algorithm_name = os.environ.get("ALGORITHM")
+    algorithm_name = os.environ.get(ENVIRONMENT_ALGORITHM)
     if algorithm_name is None:
-        algorithm_name = 'default'
+        algorithm_name = DEFAULT_ALGORITHM
 
     nodeValue = None
-    randomInitialization_str = os.environ.get("RANDOM_INITIALIZATION")
+    randomInitialization_str = os.environ.get(ENVIRONMENT_RANDOM_INITIALIZATION)
     if randomInitialization_str is None:
         randomInitialization_str = ''
     if randomInitialization_str.lower() == 'false':
@@ -228,33 +273,32 @@ if __name__ == '__main__':
     else:
         randomInitialization = True
     if not randomInitialization:
-        nodeValue = os.environ.get("NODE_VALUE")
+        nodeValue = os.environ.get(ENVIRONMENT_NODE_VALUE)
 
     def init_default_algorithm():
-        return Algorithm('default', neighbors)
+        return Algorithm(DEFAULT_ALGORITHM, neighbors)
 
     def init_communities_and_factor():
-        community_neighbors = os.environ.get("COMMUNITY_NEIGHBORS").rstrip(',').split(",")
-        #non_community_neighbors = os.environ.get("NON_COMMUNITY_NEIGHBORS").rstrip(',').split(",")
+        community_neighbors = os.environ.get(ENVIRONMENT_COMMUNITY_NEIGHBORS).rstrip(',').split(",")
         try:
-            factor = float(os.environ.get("FACTOR"))
+            factor = float(os.environ.get(ENVIRONMENT_FACTOR))
         except ValueError:
-            factor = 1.5
+            factor = DEFAULT_FACTOR
         print(f'Community neighbors set to {community_neighbors}')
         print(f'Factor set to {factor}')
         return community_neighbors, factor
     
     def init_same_community_probabilities_neighbors():
-        same_community_probabilities_neighbors_str = os.environ.get("SAME_COMMUNITY_PROBABILITIES_NEIGHBORS")
+        same_community_probabilities_neighbors_str = os.environ.get(ENVIRONMENT_SAME_COMMUNITY_PROBABILITIES_NEIGHBORS)
         same_community_probabilities_neighbors = [float(item) for item in same_community_probabilities_neighbors_str.rstrip(',').split(",")]
         print(f'Same community probabilities set to {same_community_probabilities_neighbors}')
         return same_community_probabilities_neighbors
     
     def init_memory():
         try:
-            prior_partner_factor = float(os.environ.get("PRIOR_PARTNER_FACTOR"))
+            prior_partner_factor = float(os.environ.get(ENVIRONMENT_PRIOR_PARTNER_FACTOR))
         except ValueError:
-            prior_partner_factor = 0.5
+            prior_partner_factor = DEFAULT_ALGORITHM
         print(f'Prior partner factor set to {prior_partner_factor}')
         return prior_partner_factor
 
@@ -278,10 +322,10 @@ if __name__ == '__main__':
 
     def init_algorithm(name):
         init_funcs = {
-            'weighted_factor': init_weighted_factor,
-            'weighted_factor_memory': init_weighted_factor_memory,
-            'community_probabilities': init_community_probabilities,
-            'community_probabilities_memory' :  init_community_probabilities_memory
+            ALGORITHM_WEIGHTED_FACTOR : init_weighted_factor,
+            ALGORITHM_WEIGHTED_FACTOR_MEMORY: init_weighted_factor_memory,
+            ALGORITHM_COMMUNITY_PROBABILITIES: init_community_probabilities,
+            ALGORITHM_COMMUNITY_PROBABILITIES_MEMORY :  init_community_probabilities_memory
         }
         init_func = init_funcs.get(name, init_default_algorithm)
         algorithm = init_func()
@@ -291,9 +335,9 @@ if __name__ == '__main__':
     service = GossipService(name, init_algorithm(algorithm_name), nodeValue, stop_event)
     server = grpc.server(futures.ThreadPoolExecutor())
     gossip_pb2_grpc.add_GossipServicer_to_server(service, server)
-    server.add_insecure_port('[::]:50051')
+    server.add_insecure_port(f'[::]:{GRPC_SERVICE_PORT}')
     server.start()
-    print("Server started on port 50051")
+    print(f"Server started on port {GRPC_SERVICE_PORT}")
     # Wait for the stop event to be set when stop application grpc call is invoked
     stop_event.wait()
     print("Stopping server...")

@@ -21,6 +21,8 @@ sys.path.append("/app/grpc_compiled")
 import gossip_pb2
 import gossip_pb2_grpc
 
+from cfg import *
+
 class MinioAccess:
     def __init__(self, endpoint, user, password):
         self.endpoint = endpoint
@@ -38,7 +40,7 @@ class GraphData:
         self.nodes = nodes
         self.graph = graph
         # Regular expression to match the number after the last '-' in the node name
-        pattern = re.compile(r'-(\d+)(?![\d-])')
+        pattern = re.compile(REGEX_NODE_NAME_PATTERN)
         self.node_dict = dict((node_name, re.findall(pattern, node_name)[-1]) for node_name in nodes)
         self.visualize = visualize
         self.properties = graph_properties
@@ -116,7 +118,7 @@ class GossipRunner:
         # shortcut to nodes
         self.nodes = graph_data.nodes
         self.graph = graph_data.graph
-        self.stubs = [gossip_pb2_grpc.GossipStub(grpc.insecure_channel(f"{node}:50051")) for node in nodes]
+        self.stubs = [gossip_pb2_grpc.GossipStub(grpc.insecure_channel(f"{node}:{GRPC_SERVICE_PORT}")) for node in nodes]
         self.stub_dict = {node: stub for node, stub in zip(nodes, self.stubs)}
         self.buffer_dict = {}
         # print(f"Stubs set to {self.stub_dict}")
@@ -163,7 +165,7 @@ class GossipRunner:
                     idx += 1
                 node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
             else:
-                node_color = '#FFFFFF'
+                node_color = DEFAULT_NODE_COLOR
             self.graph.nodes[node]['node_color'] = node_color
             print(f'Set node color {node_color} for node {node}')
         print(f'Node colors set for each node in graph')
@@ -194,25 +196,28 @@ class GossipRunner:
             graph_node = self.graph_data.node_dict[node]
             self.graph.nodes[graph_node]['value'] = value
 
-    
-    def store_results(self):
-
-        try:
-            client = Minio(
+    def init_minio(self):
+        client = Minio(
                 self.minio_access.endpoint,
                 access_key=self.minio_access.user,
                 secret_key=self.minio_access.password,
                 secure=False
             )
 
-            # Make 'simulations' bucket if not exist.
-            found = client.bucket_exists("simulations")
-            if not found:
-                client.make_bucket("simulations")
-            else:
-                print("Bucket 'simulations' already exists")
+        # Make 'simulations' bucket if not exist.
+        found = client.bucket_exists(MINIO_BUCKET_NAME)
+        if not found:
+            client.make_bucket(MINIO_BUCKET_NAME)
+        else:
+            print(f"Bucket '{MINIO_BUCKET_NAME}' already exists")
 
-            current_date = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
+        return client
+
+    def store_results(self):
+        try:
+            client = self.init_minio()
+
+            current_date = datetime.datetime.now().strftime(MINIO_TIME_FORMAT_STRING)
             
             
             if self.repeated:
@@ -230,13 +235,13 @@ class GossipRunner:
                 file_size = buffer.getbuffer().nbytes
                 buffer.seek(0)  # Rewind the buffer to the beginning
                 client.put_object(
-                    "simulations",
+                    MINIO_BUCKET_NAME,
                     f'{object_path}/rounds/{object_name}.png',
                     buffer,
                     file_size,
                     content_type="image/png"
                 )
-                print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
+                print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
                 img = Image.open(buffer)
                 images[round_num] = img
                 # find  the largest image
@@ -272,57 +277,45 @@ class GossipRunner:
                 file_size = len(gif_buffer.getbuffer())
                 gif_buffer.seek(0)  # Rewind the buffer to the beginning
                 client.put_object(
-                    "simulations",
+                    MINIO_BUCKET_NAME,
                     f'{object_path}/{object_name}.gif',
                     gif_buffer,
                     file_size,
                     content_type="image/gif"
                 )
-                print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
+                print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
 
             result = Result(self.num_rounds, self.algorithm_data, self.graph_data.adj_list, self.graph_data.properties)
             if self.repeated:
                 self.results.append(result)
             object_name=f'{simulation_name}_summary'
             client.put_object(
-                "simulations",
+                MINIO_BUCKET_NAME,
                 f'{object_path}/{object_name}.json',
                 result.to_buffered_reader(),
                 result.file_size(),
                 content_type="application/json",
                 # metadata={"": ""},
             )
-            print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
+            print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
             
             object_name=f'{simulation_name}_node_value_history'
             client.put_object(
-                "simulations",
+                MINIO_BUCKET_NAME,
                 f'{object_path}/{object_name}.json',
                 self.node_value_history.to_buffered_reader(),
                 self.node_value_history.file_size(),
                 content_type="application/json",
                 # metadata={"": ""},
             )
-            print(f"Successfully uploaded '{object_name}' to bucket 'simulations'.")
+            print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
 
         except S3Error as exc:
             print("minio error occurred: ", exc)
         
     def store_average_results(self):
         try:
-            client = Minio(
-                self.minio_access.endpoint,
-                access_key=self.minio_access.user,
-                secret_key=self.minio_access.password,
-                secure=False
-            )
-
-            # Make 'simulations' bucket if not exist.
-            found = client.bucket_exists("simulations")
-            if not found:
-                client.make_bucket("simulations")
-            else:
-                print("Bucket 'simulations' already exists")
+            client = self.init_minio()
 
             object_path=self.simulation_path
 
@@ -330,7 +323,7 @@ class GossipRunner:
             averaged_result = Result(avg_num_rounds, self.algorithm_data, self.graph_data.adj_list, self.graph_data.properties)
             object_name=f'{simulation_name}_averaged_result'
             client.put_object(
-                "simulations",
+                MINIO_BUCKET_NAME,
                 f'{object_path}/{object_name}.json',
                 averaged_result.to_buffered_reader(),
                 averaged_result.file_size(),
@@ -395,56 +388,56 @@ def create_graph(adj_list):
 if __name__ == '__main__':
 
     print('Gossip runner started.')
-    minio_endpoint = os.environ.get("MINIO_ENDPOINT")
-    minio_user = os.environ.get("MINIO_USER")
-    minio_password = os.environ.get("MINIO_PASSWORD")
+    minio_endpoint = os.environ.get(ENVIRONMENT_MINIO_ENDPOINT)
+    minio_user = os.environ.get(ENVIRONMENT_MINIO_USER)
+    minio_password = os.environ.get(ENVIRONMENT_MINIO_PASSWORD)
 
     minioAccess = MinioAccess(minio_endpoint, minio_user, minio_password)
 
-    simulation_name = os.environ.get("SIMULATION")
+    simulation_name = os.environ.get(ENVIRONMENT_SIMULATION)
     if simulation_name is None:
-        simulation_name = 'unidentified'
+        simulation_name = DEFAULT_SIMULATION_NAME
 
-    algorithm = os.environ.get("ALGORITHM")
+    algorithm = os.environ.get(ENVIRONMENT_ALGORITHM)
     if algorithm is None:
-        algorithm = 'default'
+        algorithm = DEFAULT_ALGORITHM
 
     node_communities = None
-    if algorithm in ('weighted_factor', 'weighted_factor_memory', 'community_probabilities', 'community_probabilities_memory'):
+    if algorithm in NODE_COMMUNITIES_SET:
         try:
-            node_communities = json.loads(os.environ.get("NODE_COMMUNITIES"))
+            node_communities = json.loads(os.environ.get(ENVIRONMENT_NODE_COMMUNITIES))
         except (ValueError, TypeError):
             node_communities = {}
 
     try:
-        repetitions = json.loads(os.environ.get("REPITITIONS"))
+        repetitions = json.loads(os.environ.get(ENVIRONMENT_REPETITIONS))
     except (ValueError, TypeError):
-        repetitions = 1
+        repetitions = DEFAULT_REPETITIONS
     repeated = False
     if repetitions > 1:
         repeated = True
         print(f'Repeated execution of simulation for a total of {repetitions} runs')
 
     try:
-        simulation_properties = json.loads(os.environ.get("SIMULATION_PROPERTIES"))
+        simulation_properties = json.loads(os.environ.get(ENVIRONMENT_SIMULATION_PROPERTIES))
     except (ValueError, TypeError):
         simulation_properties = {}
 
     algorithmData = AlgorithmData(algorithm, simulation_properties)
     
     try:
-        graph_properties = json.loads(os.environ.get("GRAPH_PROPERTIES"))
+        graph_properties = json.loads(os.environ.get(ENVIRONMENT_GRAPH_PROPERTIES))
     except (ValueError, TypeError):
         graph_properties = {}
 
-    adj_list = os.environ.get("ADJ_LIST").rstrip(',')
+    adj_list = os.environ.get(ENVIRONMENT_ADJ_LIST).rstrip(',')
     graph = create_graph(adj_list)
 
-    nodes = os.environ.get("NODES").rstrip(',').split(",")
+    nodes = os.environ.get(ENVIRONMENT_NODES).rstrip(',').split(",")
     nodes.sort()
     print(f"Received network nodes: {nodes}")
 
-    visualize_str = os.environ.get("VISUALIZE")
+    visualize_str = os.environ.get(ENVIRONMENT_VISUALIZE)
     if visualize_str is None:
         visualize_str = ''
     if visualize_str.lower() == 'false':

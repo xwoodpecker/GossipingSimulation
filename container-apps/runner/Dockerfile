@@ -23,6 +23,7 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
 COPY grpc_compiled /app/grpc_compiled/
+COPY ../../shared/cfg.py /app/cfg.py
 COPY gossip-runner.py /app/runner.py
 
 CMD ["python", "-u", "/app/runner.py"]
