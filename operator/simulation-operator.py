@@ -72,7 +72,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         return node_community_dict, community_node_dict
 
     # comminities are needed for weighted_factor and community probability assignment
-    if algorithm in WEIGHTED_FACTOR_SET + COMMUNITY_PROBABILITIES_SET:
+    if algorithm in NODE_COMMUNITIES_SET:
         graph = nx.parse_adjlist(split_adj_list)
         # apply louvain method on the graph
         partition = community_louvain.best_partition(graph)
@@ -101,8 +101,8 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                         community_probabilities[node][neighbor_cluster] = 0
                     community_probabilities[node][neighbor_cluster] += 1 / neighbor_count
 
-        if algorithm in MEMORY_SET:
-            prior_partner_factor = spec.get('priorPartnerFactor', DEFAULT_ALGORITHM)
+    if algorithm in MEMORY_SET:
+        prior_partner_factor = spec.get('priorPartnerFactor', DEFAULT_ALGORITHM)
     
     randomInitialization = spec.get('randomInitialization', True)
     if not randomInitialization:
