@@ -15,11 +15,7 @@ xxx     * Configurable factor (todo: test)
 xxx
 todo: test prob with memory
 
-todo add algorithms:
-- baseline simple memory
-- baseline adv memory
-- weighted factor adv memory
-- comm. prob. adv memory
+
 
 
 D) document 
@@ -30,16 +26,23 @@ xxx - print node communities in json file as output
 xxx - memory alg: add incoming gossips to memory
 xxx - refactor sleep (faster runtime) -> instead wait til all node pods are running ()
 xxx - gifs with more rounds are reaaaaaally slow (too fast with not many rounds)
+xxx - refactor weights -> constantly updated instead of re-computed always
 xxx todo:  test 
 *Prio B
 xxx - refactor all strings/globalvars in one shared class
-TODO: test dockerfiles
-- advanced memory alg. -> count number of interactions (further multiplications)
- also: reset memory when own value changes
+xxx -> TODO: test dockerfiles
+
+xxx - advanced memory alg. -> count number of interactions (further multiplications)
+xxx also: reset memory when own value changes
+xxx todo add algorithms:
+xxx - baseline simple memory
+xxx - baseline adv memory
+xxx - weighted factor adv memory
+xxx - comm. prob. adv memory
+
 *Prio C
+- refactor classes / subclasses (move to separated files)
 - maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
 - can refactor algorithm as standalone custom resource (?)
-- refactor classes / subclasses (move to separated files)
-- refactor weights -> constantly updated instead of re-computed always
-*Prio d
+*Prio D
 - add comments to lots of stuff
