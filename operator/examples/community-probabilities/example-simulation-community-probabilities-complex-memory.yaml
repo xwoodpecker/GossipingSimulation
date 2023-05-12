@@ -1,0 +1,16 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: my-simulation-community-probabilities-complex-memory
+spec:
+  graphSelector:
+    matchLabels:
+      app: my-graph-with-properties
+  algorithm: community_probabilities_complex_memory
+  repetitions: 1
+  visualize: true
+  randomInitialization: false
+  priorPartnerFactor: 0.6
+  simulationProperties:
+    test: "42"
+    anotherTest: "123"

@@ -7,6 +7,7 @@ import networkx as nx
 import community as community_louvain
 from cfg import *
 
+
 # Load in-cluster configuration
 config.load_incluster_config()
 api = client.CoreV1Api()
@@ -119,13 +120,16 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
     pods = []
 
+    def get_resource_name(simulation_name, node):
+        return f'{name}-node-{node}'
+    
     def create_pods():
 
         # Create a dictionary to store the Pod names and their node number
         # Create a Pod for each node in the graph
         for node in nodes:
             # Create a Pod for this node
-            pod_name = f'{name}-{graph_name}-node-{node}'
+            pod_name = get_resource_name(name, node)
 
             labels = {
                         'app': 'gossip',
@@ -136,7 +140,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             
             env = []
 
-            neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in neighbors[node]])
+            neighbors_str = ','.join([get_resource_name(name, n) for n in neighbors[node]])
             env.append(client.V1EnvVar(name=ENVIRONMENT_NEIGHBORS, value=neighbors_str))
             
             env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
@@ -158,10 +162,8 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                     #else:
                     #    non_community_neighbors.append(neighbor_node)
 
-                community_neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in community_neighbors])
+                community_neighbors_str = ','.join([get_resource_name(name, n) for n in community_neighbors])
                 env.append(client.V1EnvVar(name=ENVIRONMENT_COMMUNITY_NEIGHBORS, value=community_neighbors_str))
-                #non_community_neighbors_str = ','.join([f'{name}-{graph_name}-node-{n}' for n in non_community_neighbors])
-                #env.append(client.V1EnvVar(name='NON_COMMUNITY_NEIGHBORS', value=non_community_neighbors_str))
                 env.append(client.V1EnvVar(name=ENVIRONMENT_FACTOR, value=str(factor)))
 
             if algorithm in COMMUNITY_PROBABILITIES_SET:
@@ -220,7 +222,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         for node in nodes:
 
-            service_name = f'{name}-{graph_name}-node-{node}'
+            service_name = get_resource_name(name, node)
 
             # this does not work I think
             labels = {
@@ -407,13 +409,15 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             'graph': graph_name
         }
 
+    logger.info(f'Waiting for node pods to start...')
     while True:
         # List all pods matching the specified labels
-        pods = api.list_namespaced_pod(namespace=namespace,
+        node_pods = api.list_namespaced_pod(namespace=namespace,
                                         label_selector=','.join([f"{k}={v}" for k, v in labels.items()]))
 
         # Check if all pods are in the "Running" state
-        if all(pod.status.phase == 'Running' for pod in pods.items):
+        if all(pod.status.phase == 'Running' for pod in node_pods.items):
+            logger.info('All node pods are now running.')
             break  # All pods are running, exit the loop
         time.sleep(1)  # Wait for 1 second before checking again
 

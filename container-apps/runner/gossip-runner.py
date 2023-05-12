@@ -50,7 +50,7 @@ class GraphData:
                 self.graph.nodes[node]['community'] = community_id
             self.community_ids = set(node_communities.values())
             self.num_communities = len(self.community_ids)
-            self.properties['nodeCommunities'] = json.dumps(node_communities, indent=2)
+            self.properties['nodeCommunities'] = node_communities
         else:
             self.community_ids = set()
             self.num_communities = 0
@@ -266,9 +266,8 @@ class GossipRunner:
 
             if len(gif_images) > 0:
                 with io.BytesIO() as output:
-                    # number of  frames
-                    frames_per_second = len(gif_images)/2
-                    imageio.mimsave(output, gif_images, format='GIF', fps=frames_per_second)
+                    # show one frame for 4 seconds
+                    imageio.mimsave(output, gif_images, format='GIF', fps=1/4)
 
                     # Create another BytesIO instance and write the gif_bytes to it
                     gif_buffer = io.BytesIO(output.getvalue())

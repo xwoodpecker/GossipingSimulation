@@ -7,6 +7,7 @@ import os
 from concurrent import futures
 import threading
 import json
+import copy
 
 sys.path.append("/app/grpc_compiled")
 import gossip_pb2
@@ -39,20 +40,20 @@ class Memory:
             self.weights[neighbor] *= self.prior_partner_factor
             self.memory.add(neighbor)
             print('DEBUG: weights got changed!!')
-        print(f'DEBUG: weights after gossip {self.weights.values}')
+        print(f'DEBUG: weights after gossip {self.weights.values()}')
 
 class ComplexMemory(Memory):
     def init_memory(self, prior_partner_factor):
         self.prior_partner_factor = prior_partner_factor
-        self.start_weights = self.weights
+        self.start_weights = copy.deepcopy(self.weights)
         
     def remember(self, neighbor):
         self.weights[neighbor] *= self.prior_partner_factor 
-        print(f'DEBUG: weights after gossip {self.weights.values}')
+        print(f'DEBUG: weights after gossip {self.weights.values()}')
 
     def forget(self):
-        self.weights = self.start_weights
-        print(f'DEBUG: weights after forgetting {self.weights.values}')
+        self.weights = copy.deepcopy(self.start_weights)
+        print(f'DEBUG: weights after forgetting {self.weights.values()}')
 
 class DefaultMemory(Algorithm, Memory):
     def __init__(self, name, neighbors, prior_partner_factor):
@@ -61,6 +62,10 @@ class DefaultMemory(Algorithm, Memory):
         for neighbor in self.neighbors:
             self.weights[neighbor] = 1.0
         super().init_memory(prior_partner_factor)
+    
+    def select_neighbor(self):
+        selected = random.choices(self.neighbors, weights=self.weights.values())[0]
+        return selected
 
 class DefaultComplexMemory(Algorithm, ComplexMemory):
     def __init__(self, name, neighbors, prior_partner_factor):
@@ -69,6 +74,10 @@ class DefaultComplexMemory(Algorithm, ComplexMemory):
         for neighbor in self.neighbors:
             self.weights[neighbor] = 1.0
         super().init_memory(prior_partner_factor)
+    
+    def select_neighbor(self):
+        selected = random.choices(self.neighbors, weights=self.weights.values())[0]
+        return selected
 
 class WeightedFactor(Algorithm):
     def __init__(self, name, neighbors, community_neighbors, factor):
@@ -84,10 +93,10 @@ class WeightedFactor(Algorithm):
                 # prioritize non-community neighbors with a given factor
                 weight = self.factor
             self.weights[neighbor] = weight
-        print(f'DEBUG: weights at the start {self.weights.values}')
+        print(f'DEBUG: weights at the start {self.weights.values()}')
     
     def select_neighbor(self):
-        selected = random.choices(self.neighbors, weights=self.weights.values)[0]
+        selected = random.choices(self.neighbors, weights=self.weights.values())[0]
         return selected
 
 class WeightedFactorMemory(WeightedFactor, Memory):
@@ -110,10 +119,10 @@ class CommunityProbabilities(Algorithm):
         self.weights = {}
         for i in range(0, len(self.neighbors)):
             self.weights[neighbors[i]] = inverted_probabilities[i]
-        print(f'DEBUG: weights at the start {self.weights.values}')
+        print(f'DEBUG: weights at the start {self.weights.values()}')
 
     def select_neighbor(self):
-        selected = random.choices(self.neighbors, weights=self.weights.values)[0]
+        selected = random.choices(self.neighbors, weights=self.weights.values())[0]
         return selected
 
 class CommunityProbabilitiesMemory(CommunityProbabilities, Memory):
@@ -153,7 +162,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         print(f"Received peer value: {peer_value} from {peer_name}")
         print(f"Current value: {self.value}")
         old_value = self.value
-        self.value = min(self.value, peer_value)
+        self.value = min(self.value, int(peer_value))
         if old_value == self.value:
             print(f"Value was not changed")
         else:
@@ -172,7 +181,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
                 client_socket.connect((neighbor, TCP_SERVICE_PORT))
-                client_socket.sendall(bytes('f{self.name}:{self.value}', 'utf-8'))
+                client_socket.sendall(bytes(f'{self.name}:{self.value}', 'utf-8'))
                 print(f"Sent {self.value} over TCP socket.")
                 data = client_socket.recv(TCP_BUFSIZE)
                 self.process_gossip_data(data)
@@ -230,7 +239,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
                         # Process incoming data
                         data = conn.recv(TCP_BUFSIZE)
                         self.process_gossip_data(data)
-                        conn.sendall(bytes('{self.name}:{self.value}', 'utf-8'))
+                        conn.sendall(bytes(f'{self.name}:{self.value}', 'utf-8'))
                         print(f"Responded with value of {self.value} over TCP socket.")
                     finally:
                         conn.close()

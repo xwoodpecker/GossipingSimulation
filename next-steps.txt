@@ -6,43 +6,20 @@ B2) add crd for simulation services (?)
         -> graph generation should be as dynamic as possible
         -> add modular graph creation rountine (github project)
 
-xxx
-xxx C) Ideas:
-xxx - Weighted Algorithm:
-xxx     * Memory (todo: test)
-xxx     * Probabilities (from comm. detection)
-xxx     * Configurable factor (todo: test)
-xxx
-todo: test prob with memory
-
-
-
-
-D) document 
+D) document
+Prio A:
+- grobkonzept bausteinsicht or sth else(?)
+- feinkonzept klassendiagramm or sth else (?)
 
 Bugfixing/Refactoring:
 *Prio A
-xxx - print node communities in json file as output 
-xxx - memory alg: add incoming gossips to memory
-xxx - refactor sleep (faster runtime) -> instead wait til all node pods are running ()
-xxx - gifs with more rounds are reaaaaaally slow (too fast with not many rounds)
-xxx - refactor weights -> constantly updated instead of re-computed always
-xxx todo:  test 
+- maybe log scale probability values for comm prob alg
+- shorten object storage file names in directories (no need for full simulation name)
 *Prio B
-xxx - refactor all strings/globalvars in one shared class
-xxx -> TODO: test dockerfiles
-
-xxx - advanced memory alg. -> count number of interactions (further multiplications)
-xxx also: reset memory when own value changes
-xxx todo add algorithms:
-xxx - baseline simple memory
-xxx - baseline adv memory
-xxx - weighted factor adv memory
-xxx - comm. prob. adv memory
-
-*Prio C
 - refactor classes / subclasses (move to separated files)
 - maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
 - can refactor algorithm as standalone custom resource (?)
-*Prio D
+*Prio C
 - add comments to lots of stuff
+- use logger logic everywhere (?)
+- run highlighting in runner/service (separation line or sth idk)

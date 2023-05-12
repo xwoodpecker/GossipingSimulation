@@ -1,0 +1,11 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: my-simulation-complex-memory
+spec:
+  graphSelector:
+    matchLabels:
+      app: my-graph-with-properties
+  algorithm: default_complex_memory
+  priorPartnerFactor: 0.5
+  visualize: false

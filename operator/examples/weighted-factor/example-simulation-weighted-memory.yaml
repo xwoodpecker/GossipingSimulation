@@ -1,0 +1,17 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: my-simulation-weighted-memory
+spec:
+  graphSelector:
+    matchLabels:
+      app: my-graph-with-properties
+  algorithm: weighted_factor_memory
+  repetitions: 1
+  visualize: true
+  randomInitialization: false
+  factor: 1.25
+  priorPartnerFactor: 0.75
+  simulationProperties:
+    test: "42"
+    anotherTest: "123"

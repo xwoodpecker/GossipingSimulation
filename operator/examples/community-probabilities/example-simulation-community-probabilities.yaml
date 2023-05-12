@@ -1,7 +1,7 @@
 apiVersion: gossip.io/v1
 kind: Simulation
 metadata:
-  name: my-simulation-weighted
+  name: my-simulation-community-probabilities
 spec:
   graphSelector:
     matchLabels:
