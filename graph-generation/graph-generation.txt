@@ -1,0 +1,64 @@
+* simple graph generation (similar to Popularity graphs but without pre-defining the number of edges)
+    node_count (int): The total number of nodes in the graph.
+    comm_count (int): The number of communities in the graph.
+    equal_sized (bool): Whether the communities should be of equal size.
+    p_intra (float): The probability of intra-community edges (0 to 1).
+    p_inter (float): The probability of inter-community edges (0 to 1)
+
+* modular graph generation 
+    network size(N), 
+    average network degree (d), 
+    total modules in the network (m),
+    and modularity (Q)
+
+* scale-free graph
+    alpha (float): The probability of adding a new node connected to an existing node with degree `k`.
+    Increasing alpha results in a higher likelihood of adding new nodes to highly connected nodes,
+    leading to a more clustered graph.
+    beta (float): The probability of rewiring an edge in the graph.
+    The beta parameter determines the probability of rewiring an edge,
+    with higher values leading to more randomization of the edges and a less clustered graph.
+    gamma (float): The probability of adding a new node unconnected to any other node.
+
+* barabasi alebrt 
+    node_count (int): The number of nodes in the graph.
+    edge_degree (int): The number of edges to attach from a new node to existing nodes.
+
+---------------------------------------------------------------
+* holme and kim powerlaw cluster graph
+https://networkx.org/documentation/stable/reference/generated/networkx.generators.random_graphs.powerlaw_cluster_graph.html#networkx.generators.random_graphs.powerlaw_cluster_graph
+nu,ber of nodes
+number of  edges
+prob. of adding a triangle after random edge
+
+* watts-Strogatz Graphs (?) 
+https://networkx.org/documentation/stable/reference/generated/networkx.generators.random_graphs.watts_strogatz_graph.html#networkx.generators.random_graphs.watts_strogatz_graph
+    n int The number of nodes
+    k int Each node is joined with its k nearest neighbors in a ring topology.
+    p float The probability of rewiring each edge
+
+*  Popularity Graphs
+-> INPUT number of nodes N , number of communities C , total edges E ,
+percentage of intra - edges IP
+1. divide the N nodes equally into C communities
+2. calculate intra - edges per community
+3. add intra - edges randomly per community
+4. add inter - edges between nodes of different communities
+--------------------------------------------------------------
+
+
+For ease of use, a python script was implemented, which provides users with an easy
+way to create configurations. It consists of a text-based user interface with two parts. In the
+first part, the user can specify which networks he wants to create. He selects the network
+type, the network-specific values, and how many networks he wants. The script supports
+creating multiple networks across multiple network parameters: intra-edges in Popularity
+networks, γ in Barabási-Albert graphs, and p in Watts-Strogatz graphs. If the user inputs
+50-90 for intra-edges the script creates networks for each Eintra value in the given range
+with a step size of 5. In the case of Watts-Strogatz and Barabási-Albert networks, one can
+give multiple values for γ and p by using - as a delimiter. For Barabási-Albert graphs,
+2-2.5-3 creates networks with values 2, 2.5 and 3 for γ.
+In the next step, the user can specify the synchronization method with the methodrelated values, 
+such as how long the synchronization runs. For example, if the user wants
+to create configuration files for the pairwise Potts model synchronization, one can specify
+if one wants to use dynamic step size, the number of spins, and the step size. The script
+then creates a configuration file for each of the networks generated in step 1.
