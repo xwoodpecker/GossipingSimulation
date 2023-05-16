@@ -8,18 +8,16 @@ B2) add crd for simulation services (?)
 
 D) document
 Prio A:
-- grobkonzept bausteinsicht or sth else(?)
-- feinkonzept klassendiagramm or sth else (?)
+- feinkonzept klassendiagramm or sth else (?) WIP
 
 Bugfixing/Refactoring:
 *Prio A
-- maybe log scale probability values for comm prob alg
-- shorten object storage file names in directories (no need for full simulation name)
+- maybe use log scale probability values for comm prob alg
 *Prio B
 - refactor classes / subclasses (move to separated files)
 - maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
-- can refactor algorithm as standalone custom resource (?)
+- possibly refactor algorithm as standalone custom resource (???)
+- run highlighting in runner/service (separation line or sth idk)
 *Prio C
 - add comments to lots of stuff
 - use logger logic everywhere (?)
-- run highlighting in runner/service (separation line or sth idk)

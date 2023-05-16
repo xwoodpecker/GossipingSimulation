@@ -45,7 +45,7 @@ GRPC_SERVICE_PORT = 50051
 TCP_SERVICE_PORT = 90
 TCP_BUFSIZE = 1024
 
-MINIO_BUCKET_NAME="simulations"
+MINIO_BUCKET_NAME = "simulations"
 MINIO_TIME_FORMAT_STRING = "%Y-%m-%d-%H-%M"
 
 REGEX_NODE_NAME_PATTERN = r"-(\d+)(?![\d-])"
@@ -59,9 +59,18 @@ DOCKER_NODE_NAME = "node-example"
 DOCKER_RUNNER_IMAGE = "xwoodpecker/runner-example:latest"
 DOCKER_RUNNER_NAME = "runner-example"
 
-MINIO_CONFIGMAP_NAME="minio-configmap"
-MINIO_SECRETS_NAME="minio-secrets"
+MINIO_CONFIGMAP_NAME = "minio-configmap"
+MINIO_SECRETS_NAME = "minio-secrets"
 
+GRAPH_TYPE_SIMPLE = "simpl"
+GRAPH_TYPE_COMPLEX = "compl"
+GRAPH_TYPE_SCALE_FREE = "scale"
+GRAPH_TYPE_BARABASI_ALBERT = "barab"
+
+POISSON_DISTRIBUTION_NAME = 'poisson'
+REGULAR_DISTRIBUTION_NAME = 'regular'
+GEOMETRIC_DISTRIBUTION_NAME = 'geometric'
+SCALE_FREE_DISTRIBUTION_NAME = 'scale-free'
 
 
 
