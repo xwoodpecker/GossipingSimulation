@@ -62,10 +62,15 @@ DOCKER_RUNNER_NAME = "runner-example"
 MINIO_CONFIGMAP_NAME = "minio-configmap"
 MINIO_SECRETS_NAME = "minio-secrets"
 
-GRAPH_TYPE_SIMPLE = "simpl"
-GRAPH_TYPE_COMPLEX = "compl"
-GRAPH_TYPE_SCALE_FREE = "scale"
-GRAPH_TYPE_BARABASI_ALBERT = "barab"
+GRAPH_TYPE_SIMPLE_SHORT = "simpl"
+GRAPH_TYPE_COMPLEX_SHORT = "compl"
+GRAPH_TYPE_SCALE_FREE_SHORT = "scale"
+GRAPH_TYPE_BARABASI_ALBERT_SHORT = "barab"
+
+GRAPH_TYPE_SIMPLE = "simple-own-implementation"
+GRAPH_TYPE_COMPLEX = "complex-fixed-modularity"
+GRAPH_TYPE_SCALE_FREE = "scale-free"
+GRAPH_TYPE_BARABASI_ALBERT = "barabasi-albert"
 
 POISSON_DISTRIBUTION_NAME = 'poisson'
 REGULAR_DISTRIBUTION_NAME = 'regular'

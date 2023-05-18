@@ -1,23 +1,24 @@
 B2) add crd for simulation services (?)
  -> can include dynamic graph generation (?)
-        -> specify generation <-> simulation configuration and workflow
-        -> rest api for graph / (simulation) object creation?
-        -> cleanup graph generation 
         -> graph generation should be as dynamic as possible
-        -> add modular graph creation rountine (github project)
+        add possibility to create 10x10 graphs with varying inputs (start->end interpolation)
+        -> add modular graph creation routine (github project)
+
+
 
 D) document
 Prio A:
 - feinkonzept klassendiagramm or sth else (?) WIP
+-> modify (?)
 
 Bugfixing/Refactoring:
 *Prio A
 - maybe use log scale probability values for comm prob alg
+- add comments to lots of stuff
+- use logger logic everywhere (?)
 *Prio B
-- refactor classes / subclasses (move to separated files)
+- refactor classes / subclasses (move to separated files) (?)
 - maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
 - possibly refactor algorithm as standalone custom resource (???)
 - run highlighting in runner/service (separation line or sth idk)
 *Prio C
-- add comments to lots of stuff
-- use logger logic everywhere (?)
