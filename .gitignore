@@ -1,2 +1,4 @@
 /_generated_graphs/
 /_deprecated/
+/graph-generation/generated_graphs/
+/graph-generation/generated_yamls/

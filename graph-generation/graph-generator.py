@@ -8,10 +8,18 @@ import random
 import community
 import colorsys
 from PIL import Image
+
 from cfg import *
 import random_modular_generator_variable_modules as rmg
 import sequence_generator as sg
 import yaml
+
+
+# from PIL.ImageFile import ImageFile
+# can be used to allow bigger images
+# Increase the limit of pixels
+# ImageFile.LOAD_TRUNCATED_IMAGES = True
+# Image.MAX_IMAGE_PIXELS = None
 
 
 def make_fully_interconnected(graph):
@@ -116,26 +124,46 @@ def plot(graph, num_comm=0, use_louvain=False):
         None
     """
     # Draw the graph using Graphviz
+    layout_args = ''
     g = pgv.AGraph(directed=False)
 
-    if num_comm > 0:
-        colors = generate_colors(num_comm)
+    if graph.number_of_nodes() <= 100:
+        if num_comm > 0:
+            colors = generate_colors(num_comm)
+            # Assign a color to each node based on its community
+            community_colors = {}
+            for node, data in graph.nodes(data=True):
+                community_id = data['louvain_community'] if use_louvain else data['community']
+                if community_id not in community_colors:
+                    community_colors[community_id] = colors.pop(0)
+                node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
+                g.add_node(node, style='filled', fillcolor=node_color)
 
-        # Assign a color to each node based on its community
-        community_colors = {}
-        for node, data in graph.nodes(data=True):
-            community_id = data['louvain_community'] if use_louvain else data['community']
-            if community_id not in community_colors:
-                community_colors[community_id] = colors.pop(0)
-            node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
-            g.add_node(node, style='filled', fillcolor=node_color)
+        # Add edges to the graph
+        for edge in graph.edges():
+            g.add_edge(edge[0], edge[1])
+    else:
+        if num_comm > 0:
+            layout_args = '-Goverlap=prism'
+            colors = generate_colors(num_comm)
+            # Add communities as nodes to the new graph
+            for i in range(0, num_comm):
+                node_color = '#' + ''.join(format(c, '02x') for c in colors.pop(0))
+                g.add_node(i, style='filled', fillcolor=node_color)
 
-    # Add edges to the graph
-    for edge in graph.edges():
-        g.add_edge(edge[0], edge[1])
+            # Add edges between connected communities
+            for edge in graph.edges():
+                node1, node2 = edge
+                community1 = graph.nodes[node1]['louvain_community'] if use_louvain else graph.nodes[node1]['community']
+                community2 = graph.nodes[node2]['louvain_community'] if use_louvain else graph.nodes[node2]['community']
+                if community1 != community2:
+                    g.add_edge(community1, community2)
+        else:
+            print('No graph will be rendered when more than 100 nodes are present and no communities exist')
+            return
 
     # Layout the graph
-    g.layout(prog='dot')
+    g.layout(prog='neato', args=layout_args)
 
     # Draw the graph to a byte buffer
     buffer = io.BytesIO()
@@ -369,7 +397,7 @@ def get_get_end_params_func(graph_type):
     return func
 
 
-def get_simple_graph_name(node_count, comm_count, equal_sized, p_intra, p_inter):
+def get_simple_graph_name(node_count, comm_count, p_intra, p_inter, equal_sized):
     eq_str = 'eq' if equal_sized else 'ne'
     return f'SIMPL_n{node_count}_c{comm_count}_{eq_str}_p1_{p_intra}_p2_{p_inter}'
 
@@ -408,7 +436,7 @@ def generate_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized)
     # this does not work (TODO: FIX)
     # reproduce: node_count: 3, communities: 2, not equalized
     for i in range(comm_count):
-        nodes = list(range(sum(sizes[:i]), sum(sizes[:i+1])))
+        nodes = list(range(sum(sizes[:i]), sum(sizes[:i + 1])))
         size = sizes[i]
         subgraph = nx.gnp_random_graph(size, p=p_intra)
         mapping = dict(zip(range(size), nodes))
@@ -418,7 +446,7 @@ def generate_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized)
 
     community_dict = {}
     for i in range(comm_count):
-        nodes = list(range(sum(sizes[:i]), sum(sizes[:i+1])))
+        nodes = list(range(sum(sizes[:i]), sum(sizes[:i + 1])))
         for node in nodes:
             community_dict[node] = i
 
@@ -602,23 +630,22 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, graph_propert
             'name': name
         },
         'spec': {
-            'adjacencyList': adjacency_list,
             'graphType': graph_type,
-            'graphProperties': graph_properties
+            'graphProperties': graph_properties,
+            'adjacencyList': adjacency_list
         }
     }
-
     if value_list is not None:
         resource_dict['spec']['valueList'] = value_list
 
-    return yaml.dump(resource_dict)
+    return yaml.dump(resource_dict, width=float("inf"))
 
 
 def save_graph_resource_yaml(content, name):
-    directory = './generated_yaml/'
+    directory = './generated_yamls/'
     os.makedirs(directory, exist_ok=True)  # Create the directory if it doesn't exist
     # Save the graph as an adjacency list
-    with open(f'./generated_yaml/{name}.yaml', 'w') as f:
+    with open(f'./generated_yamls/{name}.yaml', 'w') as f:
         f.write(content)
 
 
@@ -638,16 +665,12 @@ def get_graph_type_long(graph_type):
                                  f'{GRAPH_TYPE_SCALE_FREE_SHORT}', f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}']),
               help=f'The graph type (simple, complex, scale-free or barabasi-albert) for the created graph',
               prompt='Choose graph type:\n' +
-                     f'* [{GRAPH_TYPE_SIMPLE_SHORT}] : Simple modular graph creation based on inter/intra-edge generation\n' +
+                     f'* [{GRAPH_TYPE_SIMPLE_SHORT}] : Simple modular graph creation based on inter/intra-edge '
+                     f'generation\n' +
                      f'* [{GRAPH_TYPE_COMPLEX_SHORT}] : Complex modular graph creation based on target modularity\n' +
                      f'* [{GRAPH_TYPE_SCALE_FREE_SHORT}] : Scale-free graph creation\n' +
                      f'* [{GRAPH_TYPE_BARABASI_ALBERT_SHORT}] : Scale-free graph creation\n')
-@click.option('--count',
-              type=int,
-              default=1,
-              help='The number of graphs generated',
-              prompt='Choose the number of graphs that are to be generated')
-def generate_graphs(graph_type, count):
+def generate_graphs(graph_type):
     get_params_func = get_get_params_func(graph_type)
     get_graph_properties_func = get_get_graph_properties_func(graph_type)
     get_end_params_func = get_get_end_params_func(graph_type)
@@ -657,25 +680,49 @@ def generate_graphs(graph_type, count):
     graph_properties = [get_graph_properties_func(*graph_params)]
     graphs = [(get_graph_name(graph_type, graph_params), graph)]
 
-    if count > 1:
-        same_params = click.confirm('Do you want to initialize all graphs with the same parameters?')
+    if click.confirm('Do you want to initialize more graphs?'):
 
+        same_params = click.confirm('Do you want to initialize all graphs with the same parameters?')
         if same_params:
+            count = click.prompt('Enter the number of graphs that are to be generated', type=int, default=1)
             for _ in range(0, count - 1):
                 graph = create_graph_func(*graph_params)
                 graph_properties.append(get_graph_properties_func(*graph_params))
                 graphs.append((get_graph_name(graph_type, graph_params), graph))
-
         else:
-            one_by_one = click.confirm('Do you want to initialize each following graph one by one?')
+            while True:
+                try:
+                    nxm = click.prompt(
+                        'Enter "NxM" with N as the number of different parameters and M as the number of generated '
+                        'graphs with those parameters',
+                        type=str, default="10x1")
+                    N, M = nxm.split('x')
+                    N = int(N)
+                    M = int(M)
 
+                    # Check if N and M are positive integers
+                    if N > 0 and M > 0:
+                        break
+                    else:
+                        print("N and M must be positive integers. Please try again.")
+                except ValueError:
+                    print("Invalid input format. Please enter valid 'NxM' values.")
+
+            for _ in range(0, M - 1):
+                graph = create_graph_func(*graph_params)
+                graph_properties.append(get_graph_properties_func(*graph_params))
+                graphs.append((get_graph_name(graph_type, graph_params), graph))
+
+            one_by_one = click.confirm('Do you want to provide the different parameters one by one?')
             if one_by_one:
-                for _ in range(0, count - 1):
+                for _ in range(0, N):
                     graph_params = get_params_func()
-                    graph = create_graph_func(*graph_params)
-                    graph_properties.append(get_graph_properties_func(*graph_params))
-                    graphs.append((get_graph_name(graph_type, graph_params), graph))
+                    for _ in range(0, M):
+                        graph = create_graph_func(*graph_params)
+                        graph_properties.append(get_graph_properties_func(*graph_params))
+                        graphs.append((get_graph_name(graph_type, graph_params), graph))
             else:
+                print('Specify end parameters of the last set of graphs, values in between will be interpolated.')
                 end_params = get_end_params_func()
 
                 param_lists = []
@@ -683,38 +730,42 @@ def generate_graphs(graph_type, count):
                     if i < len(end_params):
                         start = graph_params[i]
                         end = end_params[i]
-                        values = np.linspace(start, end, count)[1:]
+                        values = np.linspace(start, end, N)[1:]
+                        if isinstance(start, int) and isinstance(end, int):
+                            values = values.astype(int)
+                        else:
+                            values = np.round(values, decimals=4)
                     else:
-                        values = np.full(count - 1, graph_params[i])
+                        values = np.full(N - 1, graph_params[i])
                     param_lists.append(values)
 
                 # Transpose the input array to align the i-th elements from each inner array
-                transposed_params = np.transpose(param_lists)
+                transposed_params = np.transpose(np.array(param_lists, dtype='object'))
                 # Create a new structure with tuples of i-th elements from each inner array
                 graph_params_list = [tuple(row) for row in transposed_params]
 
                 for params in graph_params_list:
-                    graph = create_graph_func(*params)
-                    graph_properties.append(get_graph_properties_func(*params))
-                    graphs.append((get_graph_name(graph_type, params), graph))
+                    for _ in range(0, M):
+                        graph = create_graph_func(*params)
+                        graph_properties.append(get_graph_properties_func(*params))
+                        graphs.append((get_graph_name(graph_type, params), graph))
 
-    # all graphs are created
-    # rename duplicate graph names
-    renamed_graphs = []
-    name_counts = {}
-
-    for name, graph in graphs:
-        if name not in name_counts:
-            # First occurrence of the name
-            name_counts[name] = 1
-            renamed_graphs.append((name, graph))
-        else:
-            # Duplicate name found
-            count = name_counts[name]
-            new_name = f"{name}_{count + 1}"
-            renamed_graphs.append((new_name, graph))
-            name_counts[name] += 1
-    graphs = renamed_graphs
+        # all graphs are created
+        # rename duplicate graph names
+        renamed_graphs = []
+        name_counts = {}
+        for name, graph in graphs:
+            if name not in name_counts:
+                # First occurrence of the name
+                name_counts[name] = 1
+                renamed_graphs.append((name, graph))
+            else:
+                # Duplicate name found
+                count = name_counts[name]
+                new_name = f"{name}_{count + 1}"
+                renamed_graphs.append((new_name, graph))
+                name_counts[name] += 1
+        graphs = renamed_graphs
 
     visualize = click.confirm('Do you want to see the created graphs?')
     if visualize:
@@ -734,19 +785,19 @@ def generate_graphs(graph_type, count):
         # generate k8s graph resource .yaml file
         graph_type_string = get_graph_type_long(graph_type)
 
-        value_list_string = None
+        value_list = None
         choice = click.prompt(
             'Do you want to assign random node values, use the node number as its value or ' +
             'assign custom values yourself?',
             type=click.Choice(['rand', 'own', 'custom']))
-        node_count = graphs[0].number_of_nodes()
+        node_count = max(graph[1].number_of_nodes() for graph in graphs)
         if choice == 'own':
-            value_list_string = ','.join(str(i) for i in range(1, node_count + 1))
+            value_list = list(range(0, node_count))
         if choice == 'custom':
             while True:
-                value_list_string = click.prompt(f"Enter {node_count} numbers (separated by commas)")
-                numbers = [int(num.strip()) for num in value_list_string.split(",")]
-                if len(numbers == node_count):
+                value_list_input = click.prompt(f"Enter {node_count} numbers (separated by commas)")
+                value_list = [int(num.strip()) for num in value_list_input.split(",")]
+                if len(value_list) == node_count:
                     break
                 else:
                     print('Not the right number of values. Please try again.')
@@ -764,9 +815,14 @@ def generate_graphs(graph_type, count):
             if choice == 'add':
                 name_string = added_prefix + name
             elif choice == 'own':
-                name_string = own_prefix
+
+                name_string = f'{own_prefix}_{i+1}'
             else:
                 name_string = name
+
+            value_list_string = None
+            if value_list is not None:
+                value_list_string = ','.join(str(value) for value in value_list[:graph.number_of_nodes()])
 
             # make sure that the name is max. length of 63 for k8s object compatibility
             if len(name_string) > 63:
@@ -779,7 +835,7 @@ def generate_graphs(graph_type, count):
                                                        graph_type_string,
                                                        graph_props,
                                                        value_list_string)
-            save_graph_resource_yaml(name, yaml_string)
+            save_graph_resource_yaml(yaml_string, name_string)
             i += 1
 
 

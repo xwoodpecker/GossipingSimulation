@@ -13,6 +13,9 @@ Prio A:
 
 Bugfixing/Refactoring:
 *Prio A
+- refactor runner visualization similar to generator visualization
+    (maybe put plot in sharedclass)
+    use node mean value for community nodes when doing compact visualization
 - maybe use log scale probability values for comm prob alg
 - add comments to lots of stuff
 - use logger logic everywhere (?)

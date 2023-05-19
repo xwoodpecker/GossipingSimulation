@@ -95,7 +95,7 @@ def generate_modular_networks(N, sfunction, modfunction, Q, m, avg_degree, verbo
             outdegree_list = create_outdegree_sequence(degree_list, indegree_list)
             # check if the outdegree (i.e between-degree) list is graphical
             outedge_graphical = is_graphical(outdegree_list, mod_nodes, m)
-            print("outdegree list graphical?"), outedge_graphical
+            print(f"outdegree list graphical? {outedge_graphical}")
             if outedge_graphical == True:
                 print("connecting out nodes..............")
                 # connect nodes between modules using outedge list
@@ -676,13 +676,13 @@ def test_modularity_variable_mod(G, mod_nodes, verbose):
     Q_list = [((wd_bar[i] * s[i]) / (1.0 * avg_deg * N)) - (s[i] / (1.0 * N)) ** 2 for i in range(mods)]
     Q = sum(Q_list)
     print("Summary...")
-    print("averge network degree"), avg_deg
-    print("Network size"), N
-    print("List of module sizes"), s
-    print("Estimated modularity = "), Q
+    print(f"averge network degree {avg_deg}")
+    print(f"Network size {N}")
+    print(f"List of module sizes {s}")
+    print(f"Estimated modularity = {Q}")
     if verbose:
         for modules in range(0, mods):
-            print("Module #" + str(modules) + " has node ids ="), mod_nodes[modules]
+            print("Module #" + str(modules) + " has node ids = " + mod_nodes[modules])
 
     return Q
 
