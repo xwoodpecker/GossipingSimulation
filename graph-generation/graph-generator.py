@@ -408,19 +408,17 @@ def generate_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized)
     # this does not work (TODO: FIX)
     # reproduce: node_count: 3, communities: 2, not equalized
     for i in range(comm_count):
-        nodes = range(sum(sizes[:i]), sum(sizes[:i + 1]))
+        nodes = list(range(sum(sizes[:i]), sum(sizes[:i+1])))
         size = sizes[i]
-        if size <= 1:
-            graph.add_node(nodes[0])
-        else:
-            subgraph = nx.gnp_random_graph(size, p=p_intra)
-            mapping = dict(zip(range(size), nodes))
-            subgraph = nx.relabel_nodes(subgraph, mapping)
-            graph.add_edges_from(subgraph.edges())
+        subgraph = nx.gnp_random_graph(size, p=p_intra)
+        mapping = dict(zip(range(size), nodes))
+        subgraph = nx.relabel_nodes(subgraph, mapping)
+        graph.add_nodes_from(subgraph.nodes())
+        graph.add_edges_from(subgraph.edges())
 
     community_dict = {}
     for i in range(comm_count):
-        nodes = range(sum(sizes[:i]), sum(sizes[:i + 1]))
+        nodes = list(range(sum(sizes[:i]), sum(sizes[:i+1])))
         for node in nodes:
             community_dict[node] = i
 
