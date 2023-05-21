@@ -1,27 +1,24 @@
-B2) add crd for simulation services (?)
- -> can include dynamic graph generation (?)
-        -> graph generation should be as dynamic as possible
-        add possibility to create 10x10 graphs with varying inputs (start->end interpolation)
-        -> add modular graph creation routine (github project)
-
 
 
 D) document
 Prio A:
-- feinkonzept klassendiagramm or sth else (?) WIP
--> modify (?)
+- start layout
+- write introduction
+- write background knowledge
+- write anaylsis + conception
 
 Bugfixing/Refactoring:
 *Prio A
-- refactor runner visualization similar to generator visualization
+!!! - refactor graph generation according to new diagram
+!!! - refactor runner visualization similar to generator visualization
     (maybe put plot in sharedclass)
     use node mean value for community nodes when doing compact visualization
-- maybe use log scale probability values for comm prob alg
 - add comments to lots of stuff
-- use logger logic everywhere (?)
 *Prio B
+- maybe use log scale probability values for comm prob alg
+- use logger logic everywhere (?)
 - refactor classes / subclasses (move to separated files) (?)
-- maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
-- possibly refactor algorithm as standalone custom resource (???)
 - run highlighting in runner/service (separation line or sth idk)
 *Prio C
+- maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
+- possibly refactor algorithm as standalone custom resource (???)
