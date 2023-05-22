@@ -11,31 +11,64 @@ import re
 import json
 import colorsys
 import networkx as nx
-
 import pygraphviz as pgv
-
 from minio import Minio
 from minio.error import S3Error
 
 sys.path.append("/app/grpc_compiled")
 import gossip_pb2
 import gossip_pb2_grpc
-
 from cfg import *
 
 class MinioAccess:
+    """
+    Represents access parameters for Minio.
+    """
     def __init__(self, endpoint, user, password):
+        """
+        Initialize Minio access parameters.
+
+        Args:
+            endpoint (str): The Minio server endpoint.
+            user (str): The user for Minio access.
+            password (str): The password for Minio access.
+        """
         self.endpoint = endpoint
         self.user = user
         self.password = password
 
 class AlgorithmData:
+    """
+    Represents data related to an algorithm.
+    """
     def __init__(self, name, simulation_properties):
+        """
+        Initialize algorithm data.
+
+        Args:
+            name (str): The name of the algorithm.
+            simulation_properties (dict): The properties of the simulation.
+        """
+
         self.name = name
         self.properties = simulation_properties
 
 class GraphData:
+    """
+    Represents data related to a graph.
+    """
     def __init__(self, adj_list, nodes, graph, visualize, graph_properties, node_communities=None):
+        """
+        Initialize graph data.
+
+        Args:
+            adj_list (dict): The adjacency list representation of the graph.
+            nodes (list): The list of nodes in the graph.
+            graph (networkx.Graph): The graph object.
+            visualize (bool): Flag indicating whether to visualize the graph.
+            graph_properties (dict): The properties of the graph.
+            node_communities (dict, optional): The communities of the nodes. Defaults to None.
+        """
         self.adj_list = adj_list
         self.nodes = nodes
         self.graph = graph
@@ -58,7 +91,19 @@ class GraphData:
 
 
 class Result:
+    """
+    Represents the result of a simulation.
+    """
     def __init__(self, num_rounds, algorithm_data, adj_list, graph_metadata=None):
+        """
+        Initialize the result of a simulation.
+
+        Args:
+            num_rounds (int): The number of rounds in the simulation.
+            algorithm_data (AlgorithmData): The data of the algorithm used in the simulation.
+            adj_list (dict): The adjacency list representation of the graph.
+            graph_metadata (dict, optional): Additional metadata about the graph. Defaults to None.
+        """
         self.num_rounds = num_rounds
         self.algorithm = algorithm_data.name
         self.simulation_properties = algorithm_data.properties
@@ -74,21 +119,54 @@ class Result:
         if self.simulation_properties is not None and self.simulation_properties:
             self.dict['algorithm_metadata'] = self.simulation_properties
                 
-    def to_buffered_reader(self):
-        return io.BufferedReader(io.BytesIO(str(self).encode()))
     
+    def to_buffered_reader(self):
+        """
+        Convert the result to a buffered reader.
+
+        Returns:
+            io.BufferedReader: A buffered reader containing the result data.
+        """
+        return io.BufferedReader(io.BytesIO(str(self).encode()))
+
     def file_size(self):
+        """
+        Get the file size of the result data.
+
+        Returns:
+            int: The file size in bytes.
+        """
         json_data_bytes = str(self).encode()
         return len(json_data_bytes)
-    
+
     def __str__(self):
+        """
+        Convert the result to a string representation.
+
+        Returns:
+            str: The string representation of the result.
+        """
         return json.dumps(self.dict, indent=2)
 
 class NodeValueHistory:
-    def __init__(self):
+    """
+    Represents the history of node values in a simulation.
+    """
+    def __init__(self): 
+        """
+        Initialize the NodeValueHistory object with an empty history.
+        """
         self.history = []
     
     def add(self, round_num, node, value):
+        """
+        Add a node value to the history.
+
+        Args:
+            round_num (int): The round number.
+            node (str): The node identifier.
+            value: The value associated with the node.
+        """
         round_data = next((data for data in self.history if data['round_num'] == round_num), None)
         if round_data is None:
             round_data = {'round_num': round_num, 'nodes': {node: value}}
@@ -97,20 +175,53 @@ class NodeValueHistory:
             round_data['nodes'][node] = value
     
     def to_buffered_reader(self):
+        """
+        Convert the node value history to a buffered reader.
+
+        Returns:
+            io.BufferedReader: A buffered reader containing the node value history data.
+        """
         return io.BufferedReader(io.BytesIO(str(self).encode()))
     
     def file_size(self):
+        """
+        Get the file size of the node value history data.
+
+        Returns:
+            int: The file size in bytes.
+        """
         json_data_bytes = str(self).encode()
         return len(json_data_bytes)
     
     def __str__(self):
+        """
+        Convert the node value history data to a string representation.
+
+        Returns:
+            str: The string representation of the node value history data.
+        """
         return json.dumps(self.history, indent=2)
 
 class GossipRunner:
+    """
+    Represents the runner for the gossip simulation.
+    Makes the hosts gossip round by round and stores the simulation results.
+    """
     def __init__(self, simulation_name, algorithm_data, repeated, graph_data, minio_access):
+        """
+        Initialize the GossipRunner.
+
+        Args:
+            simulation_name (str): The name of the simulation.
+            algorithm_data (AlgorithmData): The data of the algorithm used in the simulation.
+            repeated (bool): Flag indicating whether the simulation should be repeated.
+            graph_data (GraphData): The data of the graph used in the simulation.
+            minio_access (MinioAccess): The access credentials for MinIO.
+        """
         self.simulation_name = simulation_name
         self.algorithm_data = algorithm_data
         self.algorithm = algorithm_data.name
+        # set run number and results if repeated execution
         self.repeated = repeated
         if repeated:
             self.results = []
@@ -119,26 +230,47 @@ class GossipRunner:
         # shortcut to nodes
         self.nodes = graph_data.nodes
         self.graph = graph_data.graph
+        # set the grpc gossip stubs that are used for runner to node communication
         self.stubs = [gossip_pb2_grpc.GossipStub(grpc.insecure_channel(f"{node}:{GRPC_SERVICE_PORT}")) for node in nodes]
         self.stub_dict = {node: stub for node, stub in zip(nodes, self.stubs)}
         self.buffer_dict = {}
-        # print(f"Stubs set to {self.stub_dict}")
         self.minio_access = minio_access
+        # init graph plot, generates pgv graph with colors and labels
         self.init_graph_plot(self.graph_data.num_communities)
 
     def init_next_run(self):
+        """
+        Initialize the next run of the simulation by incrementing the run number and resetting the state.
+        """
         self.run_number += 1
         self.reset()
 
     def reset(self):
+        """
+        Reset the state of the simulation by invoking the Reset method for each node.
+        """
         self.buffer_dict = {}
         for node in self.nodes:
             print(f"Invoking Reset for node {node}.")
             response = self.stub_dict[node].Reset(gossip_pb2.ResetRequest())
 
     def init_graph_plot(self, num_comm=0):
+        """
+        Initialize the graph plot for visualization.
 
+        Args:
+            num_comm (int): The number of communities in the graph (default: 0).
+        """
         def generate_colors(num_colors):
+            """
+            Generate a list of colors for visualization.
+
+            Args:
+                num_colors (int): The number of colors to generate.
+
+            Returns:
+                List: A list of RGB color tuples.
+            """
             colors = []
             for i in range(num_colors):
                 # Generate a color with a different hue value for each iteration
@@ -156,6 +288,7 @@ class GossipRunner:
             colors = generate_colors(num_comm)
             print(f'Community colors generated')
 
+        # initialie the pgv graph
         g = pgv.AGraph(directed=False)
 
         if self.graph.number_of_nodes() <= MAXIMUM_NODE_NUMBER_NORMAL_PLOT:
@@ -196,13 +329,20 @@ class GossipRunner:
             else:
                 print('No communities but too many nodes present, no pgv graph will be set.')
                 return
-
+        # set the gpv graph to the local var
         self.pgv_graph = g
             
     def plot_graph(self, round_num, num_comm=0):
+        """
+        Plot the graph to visualize the state of the nodes.
+        Updates node labels according to the current round.
+        Uses stored pgv graph to minimize compuation load.
+
+        Args:
+            round_num (int): The current round number.
+            num_comm (int): The number of communities in the graph (default: 0).
+        """
         # Draw the graph using Graphviz
-        layout_args = ''
-        
         if self.graph.number_of_nodes() <= MAXIMUM_NODE_NUMBER_NORMAL_PLOT:
             for node, data in self.graph.nodes(data=True):
                 label = f"<{node}:<b>{data['value']}</b>>"
@@ -210,7 +350,6 @@ class GossipRunner:
 
         else:
             if num_comm > 0:
-                layout_args = '-Goverlap=prism'
                 for i in range(0, num_comm):
                     community_nodes = [node for node, community in self.node_communities.items() if community == i]
                     values = []
@@ -225,7 +364,7 @@ class GossipRunner:
                 return
 
         # Layout the graph
-        self.pgv_graph.layout(prog='neato', args=layout_args)
+        self.pgv_graph.layout(prog='neato')
 
         # Draw the graph to a byte buffer
         buffer = io.BytesIO()
@@ -234,10 +373,23 @@ class GossipRunner:
         print(f'Created plot for simulation {simulation_name} in round {round_num}')
 
     def update_graph_node(self, node, value):
-            graph_node = self.graph_data.node_dict[node]
-            self.graph.nodes[graph_node]['value'] = value
+        """
+        Update the value of a node in the graph.
+
+        Args:
+            node: The node identifier.
+            value: The new value for the node.
+        """
+        graph_node = self.graph_data.node_dict[node]
+        self.graph.nodes[graph_node]['value'] = value
 
     def init_minio(self):
+        """
+        Initialize the Minio client and create the 'simulations' bucket if it does not exist.
+
+        Returns:
+            Minio: The Minio client instance.
+        """
         client = Minio(
                 self.minio_access.endpoint,
                 access_key=self.minio_access.user,
@@ -255,6 +407,9 @@ class GossipRunner:
         return client
 
     def store_results(self):
+        """
+        Store the simulation results in Minio.
+        """
         try:
             client = self.init_minio()
 
@@ -354,6 +509,9 @@ class GossipRunner:
             print("minio error occurred: ", exc)
         
     def store_average_results(self):
+        """
+        Store the averaged simulation results in Minio.
+        """
         try:
             client = self.init_minio()
 
@@ -375,6 +533,10 @@ class GossipRunner:
 
 
     def init_node_value_history(self):
+        """
+        Initialize the node value history and update the graph with initial values.
+        """
+
         self.node_value_history = NodeValueHistory()
         for node in self.stub_dict: 
             response = self.stub_dict[node].CurrentValue(gossip_pb2.CurrentValueRequest())
@@ -385,6 +547,9 @@ class GossipRunner:
             self.plot_graph(0, self.graph_data.num_communities)
 
     def run(self):
+        """
+        Run the gossip simulation.
+        """
         round_num = 1
         while True:
             print(f"Starting round {round_num} of gossiping...")
@@ -418,6 +583,15 @@ class GossipRunner:
             print(f"Sent stop application request to node {node}")
 
 def create_graph(adj_list):
+    """
+    Create a graph based on the provided adjacency list.
+
+    Args:
+        adj_list (str): The adjacency list representing the graph.
+
+    Returns:
+        graph (networkx.Graph): The created graph.
+    """
     # Read the adjacency list and create a graph
     print(f'Creating graph for adjacency list: {adj_list}')
     graph = nx.parse_adjlist(adj_list.split(','))
@@ -428,27 +602,26 @@ def create_graph(adj_list):
 if __name__ == '__main__':
 
     print('Gossip runner started.')
+    # minio environment variables
     minio_endpoint = os.environ.get(ENVIRONMENT_MINIO_ENDPOINT)
     minio_user = os.environ.get(ENVIRONMENT_MINIO_USER)
     minio_password = os.environ.get(ENVIRONMENT_MINIO_PASSWORD)
-
     minioAccess = MinioAccess(minio_endpoint, minio_user, minio_password)
-
+    # general environment variables
     simulation_name = os.environ.get(ENVIRONMENT_SIMULATION)
     if simulation_name is None:
         simulation_name = DEFAULT_SIMULATION_NAME
-
     algorithm = os.environ.get(ENVIRONMENT_ALGORITHM)
     if algorithm is None:
         algorithm = DEFAULT_ALGORITHM
-
+    # node communities specific variable
     node_communities = None
     if algorithm in NODE_COMMUNITIES_SET:
         try:
             node_communities = json.loads(os.environ.get(ENVIRONMENT_NODE_COMMUNITIES))
         except (ValueError, TypeError):
             node_communities = {}
-
+    # env variable for repeated execution
     try:
         repetitions = json.loads(os.environ.get(ENVIRONMENT_REPETITIONS))
     except (ValueError, TypeError):
@@ -457,26 +630,26 @@ if __name__ == '__main__':
     if repetitions > 1:
         repeated = True
         print(f'Repeated execution of simulation for a total of {repetitions} runs')
-
+    # load simulation properties for logging
     try:
         simulation_properties = json.loads(os.environ.get(ENVIRONMENT_SIMULATION_PROPERTIES))
     except (ValueError, TypeError):
         simulation_properties = {}
-
+    # initialize algorithm data
     algorithmData = AlgorithmData(algorithm, simulation_properties)
-    
+    # also load graph properties for logging
     try:
         graph_properties = json.loads(os.environ.get(ENVIRONMENT_GRAPH_PROPERTIES))
     except (ValueError, TypeError):
         graph_properties = {}
-
+    # generate the graph from the adj list
     adj_list = os.environ.get(ENVIRONMENT_ADJ_LIST).rstrip(',')
     graph = create_graph(adj_list)
-
+    # get and sort the network nodes for communication
     nodes = os.environ.get(ENVIRONMENT_NODES).rstrip(',').split(",")
     nodes.sort()
     print(f"Received network nodes: {nodes}")
-
+    # env for visualization settings
     visualize_str = os.environ.get(ENVIRONMENT_VISUALIZE)
     if visualize_str is None:
         visualize_str = ''
@@ -484,12 +657,15 @@ if __name__ == '__main__':
         visualize = False
     else:
         visualize = True
-
+    # initialize graph data
     graphData = GraphData(adj_list, nodes, graph, visualize, graph_properties, node_communities)
-
+    # initialize the gossip runner
     runner = GossipRunner(simulation_name, algorithmData, repeated, graphData, minioAccess)
+    # initialize the node value history before running
     runner.init_node_value_history()
+    # run the simulation until it converges
     runner.run()
+    # store all simulation results
     runner.store_results()
 
     # repeat for additional repetitions
@@ -500,8 +676,10 @@ if __name__ == '__main__':
         runner.run()
         runner.store_results()
     if repeated:
+        # store averaged results (over multiple runs)
         runner.store_average_results()
 
+    # stop all nodes over grpc
     runner.stop_node_applications()
     print("Stopping application.")
     sys.exit(0)

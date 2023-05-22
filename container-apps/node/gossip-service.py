@@ -20,6 +20,7 @@ class ValueEntry:
     Represents a value entry with the number of gossiping participations 
     and the current value.
     """
+
     def __init__(self, participations, value):
         """
         Initialize a ValueEntry object.
@@ -37,6 +38,7 @@ class Algorithm:
     Represents an algorithm with a name and a list of neighbors.
     The algorithm's function is to select a neighbor for gossiping.
     """
+
     def __init__(self, name, neighbors):
         """
         Initialize an Algorithm object.
@@ -65,6 +67,7 @@ class Memory:
     Represents a memory object with memory storage and prior partner factor.
     The factor is used to discourage repeated gossiping between the same nodes.
     """
+
     def init_memory(self, prior_partner_factor):
         """
         Initialize the memory.
@@ -96,6 +99,7 @@ class ComplexMemory(Memory):
     It also enhances the normal memory with the ability to forget.
     Forgetting restores the start weights.
     """
+
     def init_memory(self, prior_partner_factor):
         """
         Initialize the complex memory.
@@ -128,6 +132,7 @@ class DefaultMemory(Algorithm, Memory):
     """
     Represents the default memory algorithm. It inherits from both Algorithm and Memory.
     """
+
     def __init__(self, name, neighbors, prior_partner_factor):
         """
         Initialize the default memory.
@@ -158,6 +163,7 @@ class DefaultComplexMemory(Algorithm, ComplexMemory):
     """
     Represents the default complex memory algorithm. It inherits from both Algorithm and ComplexMemory.
     """
+
     def __init__(self, name, neighbors, prior_partner_factor):
         """
         Initialize the default complex memory.
@@ -182,10 +188,13 @@ class DefaultComplexMemory(Algorithm, ComplexMemory):
         """
         selected = random.choices(self.neighbors, weights=self.weights.values())[0]
         return selected
+
+
 class WeightedFactor(Algorithm):
     """
     Represents a weighted factor object that inherits from Algorithm.
     """
+
     def __init__(self, name, neighbors, community_neighbors, factor):
         """
         Initialize the weighted factor.
@@ -225,6 +234,7 @@ class WeightedFactorMemory(WeightedFactor, Memory):
     """
     Represents the weighted factor memory algorithm that inherits from both WeightedFactor and Memory.
     """
+
     def __init__(self, name, neighbors, community_neighbors, factor, prior_partner_factor):
         """
         Initialize the weighted factor memory.
@@ -244,6 +254,7 @@ class WeightedFactorComplexMemory(WeightedFactor, ComplexMemory):
     """
     Represents the weighted factor complex memory algorithm that inherits from both WeightedFactor and ComplexMemory.
     """
+
     def __init__(self, name, neighbors, community_neighbors, factor, prior_partner_factor):
         """
         Initialize the weighted factor complex memory.
@@ -258,10 +269,12 @@ class WeightedFactorComplexMemory(WeightedFactor, ComplexMemory):
         super().__init__(name, neighbors, community_neighbors, factor)
         super().init_memory(prior_partner_factor)
 
+
 class CommunityProbabilities(Algorithm):
     """
     Represents a community probabilities object that inherits from Algorithm.
     """
+
     def __init__(self, name, neighbors, same_community_probabilities_neighbors):
         """
         Initialize the community probabilities.
@@ -295,6 +308,7 @@ class CommunityProbabilitiesMemory(CommunityProbabilities, Memory):
     """
     Represents a community probabilities memory algorithm that inherits from both CommunityProbabilities and Memory.
     """
+
     def __init__(self, name, neighbors, same_community_probabilities_neighbors, prior_partner_factor):
         """
         Initialize the community probabilities memory.
@@ -313,6 +327,7 @@ class CommunityProbabilitiesComplexMemory(CommunityProbabilities, ComplexMemory)
     """
     Represents a community probabilities complex memory algorithm that inherits from both CommunityProbabilities and ComplexMemory.
     """
+
     def __init__(self, name, neighbors, same_community_probabilities_neighbors, prior_partner_factor):
         """
         Initialize the community probabilities complex memory.
@@ -326,8 +341,6 @@ class CommunityProbabilitiesComplexMemory(CommunityProbabilities, ComplexMemory)
         super().__init__(name, neighbors, same_community_probabilities_neighbors)
         super().init_memory(prior_partner_factor)
 
-
-        
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
     """
@@ -392,7 +405,6 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         if isinstance(self.algorithm, Memory):
             self.algorithm.remember(peer_name)
 
-
     def gossip(self):
         """
         Perform the gossip operation.
@@ -414,7 +426,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         except socket.error as e:
             print(f"Socket error occurred: {str(e)}")
         print('Finished gossiping.')
-    
+
     def Reset(self, request, context):
         """
         Handle the GRPC Reset request.
@@ -434,7 +446,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         print(f'GossipService reset on {self.name} with original value {self.value}.')
         return gossip_pb2.ResetResponse()
 
-    def Gossip(self, request, context):  
+    def Gossip(self, request, context):
         """
         Handle the GRPC Gossip request.
 
@@ -461,8 +473,8 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
             gossip_pb2.HistoryResponse: The History response.
         """
         print('[GRPC History invoked]')
-        value_entries =[gossip_pb2.ValueEntry( participations=entry.participations, value=entry.value) 
-            for entry in self.value_entries]
+        value_entries = [gossip_pb2.ValueEntry(participations=entry.participations, value=entry.value)
+                         for entry in self.value_entries]
         return gossip_pb2.HistoryResponse(value_entries=value_entries)
 
     def CurrentValue(self, request, context):
@@ -479,7 +491,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         print('[GRPC CurrentValue invoked]')
         print(f"Returning value {self.value}.")
         return gossip_pb2.CurrentValueResponse(value=self.value)
-    
+
     def StopApplication(self, request, context):
         """
         Handle the GRPC StopApplication request.
@@ -511,11 +523,11 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
                 server_socket.listen(1)
                 print(f'Listening on port {TCP_SERVICE_PORT} for incoming gossip...')
                 while not self.stop_listening:
-                    server_socket.settimeout(3) 
-                    try: 
+                    server_socket.settimeout(3)
+                    try:
                         conn, addr = server_socket.accept()
                     except socket.timeout:
-                        continue 
+                        continue
                     try:
                         print(f'Gossiping request accepted from {addr[0]}:{addr[1]}')
                         # Process incoming data
@@ -552,6 +564,7 @@ if __name__ == '__main__':
     if not randomInitialization:
         nodeValue = os.environ.get(ENVIRONMENT_NODE_VALUE)
 
+
     def init_default_algorithm():
         """
         Initialize the default algorithm.
@@ -560,6 +573,7 @@ if __name__ == '__main__':
             Algorithm: The default algorithm.
         """
         return Algorithm(DEFAULT_ALGORITHM, neighbors)
+
 
     def init_communities_and_factor():
         """
@@ -576,7 +590,8 @@ if __name__ == '__main__':
         print(f'Community neighbors set to {community_neighbors}')
         print(f'Factor set to {factor}')
         return community_neighbors, factor
-    
+
+
     def init_same_community_probabilities_neighbors():
         """
         Initialize the same community probabilities neighbors.
@@ -585,10 +600,12 @@ if __name__ == '__main__':
             list: The same community probabilities neighbors.
         """
         same_community_probabilities_neighbors_str = os.environ.get(ENVIRONMENT_SAME_COMMUNITY_PROBABILITIES_NEIGHBORS)
-        same_community_probabilities_neighbors = [float(item) for item in same_community_probabilities_neighbors_str.rstrip(',').split(",")]
+        same_community_probabilities_neighbors = [float(item) for item in
+                                                  same_community_probabilities_neighbors_str.rstrip(',').split(",")]
         print(f'Same community probabilities set to {same_community_probabilities_neighbors}')
         return same_community_probabilities_neighbors
-    
+
+
     def init_memory():
         """
         Initialize the prior partner factor.
@@ -602,7 +619,8 @@ if __name__ == '__main__':
             prior_partner_factor = DEFAULT_ALGORITHM
         print(f'Prior partner factor set to {prior_partner_factor}')
         return prior_partner_factor
-    
+
+
     def init_default_memory():
         """
         Initialize the default memory algorithm.
@@ -612,7 +630,8 @@ if __name__ == '__main__':
         """
         prior_partner_factor = init_memory()
         return DefaultMemory(algorithm_name, neighbors, prior_partner_factor)
-    
+
+
     def init_default_complex_memory():
         """
         Initialize the default complex memory algorithm.
@@ -623,6 +642,7 @@ if __name__ == '__main__':
         prior_partner_factor = init_memory()
         return DefaultComplexMemory(algorithm_name, neighbors, prior_partner_factor)
 
+
     def init_weighted_factor():
         """
         Initialize the weighted factor algorithm.
@@ -632,7 +652,8 @@ if __name__ == '__main__':
         """
         community_neighbors, factor = init_communities_and_factor()
         return WeightedFactor(algorithm_name, neighbors, community_neighbors, factor)
-    
+
+
     def init_weighted_factor_memory():
         """
         Initialize the weighted factor memory algorithm.
@@ -642,8 +663,9 @@ if __name__ == '__main__':
         """
         community_neighbors, factor = init_communities_and_factor()
         prior_partner_factor = init_memory()
-        return WeightedFactorMemory(algorithm_name, neighbors, community_neighbors, factor, prior_partner_factor) 
-    
+        return WeightedFactorMemory(algorithm_name, neighbors, community_neighbors, factor, prior_partner_factor)
+
+
     def init_weighted_factor_complex_memory():
         """
         Initialize the weighted factor complex memory algorithm.
@@ -653,8 +675,9 @@ if __name__ == '__main__':
         """
         community_neighbors, factor = init_communities_and_factor()
         prior_partner_factor = init_memory()
-        return WeightedFactorComplexMemory(algorithm_name, neighbors, community_neighbors, factor, prior_partner_factor) 
-    
+        return WeightedFactorComplexMemory(algorithm_name, neighbors, community_neighbors, factor, prior_partner_factor)
+
+
     def init_community_probabilities():
         """
         Initialize the community probabilities algorithm.
@@ -664,7 +687,8 @@ if __name__ == '__main__':
         """
         same_community_probabilities_neighbors = init_same_community_probabilities_neighbors()
         return CommunityProbabilities(algorithm_name, neighbors, same_community_probabilities_neighbors)
-    
+
+
     def init_community_probabilities_memory():
         """
         Initialize the community probabilities memory algorithm.
@@ -674,8 +698,10 @@ if __name__ == '__main__':
         """
         same_community_probabilities_neighbors = init_same_community_probabilities_neighbors()
         prior_partner_factor = init_memory()
-        return CommunityProbabilitiesMemory(algorithm_name, neighbors, same_community_probabilities_neighbors, prior_partner_factor)
-    
+        return CommunityProbabilitiesMemory(algorithm_name, neighbors, same_community_probabilities_neighbors,
+                                            prior_partner_factor)
+
+
     def init_community_probabilities_complex_memory():
         """
         Initialize the community probabilities complex memory algorithm.
@@ -685,7 +711,9 @@ if __name__ == '__main__':
         """
         same_community_probabilities_neighbors = init_same_community_probabilities_neighbors()
         prior_partner_factor = init_memory()
-        return CommunityProbabilitiesComplexMemory(algorithm_name, neighbors, same_community_probabilities_neighbors, prior_partner_factor)
+        return CommunityProbabilitiesComplexMemory(algorithm_name, neighbors, same_community_probabilities_neighbors,
+                                                   prior_partner_factor)
+
 
     def init_algorithm(name):
         """
@@ -700,12 +728,12 @@ if __name__ == '__main__':
         init_funcs = {
             ALGORITHM_DEFAULT_MEMORY: init_default_memory,
             ALGORITHM_DEFAULT_COMPLEX_MEMORY: init_default_complex_memory,
-            ALGORITHM_WEIGHTED_FACTOR : init_weighted_factor,
+            ALGORITHM_WEIGHTED_FACTOR: init_weighted_factor,
             ALGORITHM_WEIGHTED_FACTOR_MEMORY: init_weighted_factor_memory,
             ALGORITHM_WEIGHTED_FACTOR_COMPLEX_MEMORY: init_weighted_factor_complex_memory,
             ALGORITHM_COMMUNITY_PROBABILITIES: init_community_probabilities,
-            ALGORITHM_COMMUNITY_PROBABILITIES_MEMORY :  init_community_probabilities_memory,
-            ALGORITHM_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY :  init_community_probabilities_complex_memory
+            ALGORITHM_COMMUNITY_PROBABILITIES_MEMORY: init_community_probabilities_memory,
+            ALGORITHM_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY: init_community_probabilities_complex_memory
         }
         init_func = init_funcs.get(name, init_default_algorithm)
         algorithm = init_func()
