@@ -46,6 +46,7 @@ class GraphData:
         self.properties = graph_properties
         # set the community field to the respective id if necessary
         if node_communities:
+            self.node_communities = node_communities
             for node, community_id in node_communities.items():
                 self.graph.nodes[node]['community'] = community_id
             self.community_ids = set(node_communities.values())
@@ -123,7 +124,7 @@ class GossipRunner:
         self.buffer_dict = {}
         # print(f"Stubs set to {self.stub_dict}")
         self.minio_access = minio_access
-        self.init_plot_colors(self.graph_data.num_communities)
+        self.init_graph_plot(self.graph_data.num_communities)
 
     def init_next_run(self):
         self.run_number += 1
@@ -135,7 +136,7 @@ class GossipRunner:
             print(f"Invoking Reset for node {node}.")
             response = self.stub_dict[node].Reset(gossip_pb2.ResetRequest())
 
-    def init_plot_colors(self, num_comm=0):
+    def init_graph_plot(self, num_comm=0):
 
         def generate_colors(num_colors):
             colors = []
@@ -153,42 +154,82 @@ class GossipRunner:
         
         if num_comm > 0:
             colors = generate_colors(num_comm)
+            print(f'Community colors generated')
 
-        # Assign a color to each node based on its community
-        idx = 0    
-        community_colors = {}
-        for node, data in self.graph.nodes(data=True):
-            if num_comm > 0:
-                community_id = data['community']
-                if community_id not in community_colors:
-                    community_colors[community_id] = colors[idx]
-                    idx += 1
-                node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
-            else:
-                node_color = DEFAULT_NODE_COLOR
-            self.graph.nodes[node]['node_color'] = node_color
-            print(f'Set node color {node_color} for node {node}')
-        print(f'Node colors set for each node in graph')
-
-
-    def plot_graph(self, round_num, num_comm=0):
-        # Draw the graph using Graphviz
         g = pgv.AGraph(directed=False)
 
-        for node, data in self.graph.nodes(data=True):
-            label=f"<{node}:<b>{data['value']}</b>>"
-            g.add_node(node, style='filled', fillcolor=self.graph.nodes[node]['node_color'], label=label)
+        if self.graph.number_of_nodes() <= 100:
+            # Assign a color to each node based on its community
+            idx = 0    
+            community_colors = {}
+            for node, data in self.graph.nodes(data=True):
+                if num_comm > 0:
+                    community_id = data['community']
+                    if community_id not in community_colors:
+                        community_colors[community_id] = colors[idx]
+                        idx += 1
+                    node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
+                else:
+                    node_color = DEFAULT_NODE_COLOR
+                g.add_node(node, style='filled', fillcolor=node_color)
+                print(f'Added node {node} with color {node_color} to pgv graph')
+            print(f'All nodes set for pgv graph')
+            
+            # Add edges to the graph
+            for edge in self.graph.edges():
+                g.add_edge(edge[0], edge[1])
+            print(f'All edges added for pgv graph')
+        else:         
+            if num_comm > 0:
+                # Add communities as nodes to the new graph
+                for i in range(0, num_comm):
+                    node_color = '#' + ''.join(format(c, '02x') for c in colors.pop(0))
+                    g.add_node(i, style='filled', fillcolor=node_color)
 
-        # Add edges to the graph
-        for edge in self.graph.edges():
-            g.add_edge(edge[0], edge[1])
+                # Add edges between connected communities
+                for edge in graph.edges():
+                    node1, node2 = edge
+                    community1 = graph.nodes[node1]['community']
+                    community2 = graph.nodes[node2]['community']
+                    if community1 != community2:
+                        g.add_edge(community1, community2)
+            else:
+                print('No communities but too many nodes present, no pgv graph will be set.')
+                return
+
+        self.pgv_graph = g
+            
+    def plot_graph(self, round_num, num_comm=0):
+        # Draw the graph using Graphviz
+        layout_args = ''
+        
+        if self.graph.number_of_nodes() <= 100:
+            for node, data in self.graph.nodes(data=True):
+                label = f"<{node}:<b>{data['value']}</b>>"
+                self.pgv_graph.get_node(node).attr['label'] = label
+
+        else:
+            if num_comm > 0:
+                layout_args = '-Goverlap=prism'
+                for i in range(0, num_comm):
+                    community_nodes = [node for node, community in self.node_communities.items() if community == i]
+                    values = []
+                    for node in community_nodes:
+                        node_value = self.graph.nodes[node]['value']
+                        values.append(node_value)
+                    avg_value = sum(values ) / len(values)
+                    label = f"<<b>{round(avg_value, 2)}</b>>"
+                    self.pgv_graph.get_node(i).attr['label'] = label
+            else:
+                print('No graph will be rendered when more than 100 nodes are present and no communities exist')
+                return
 
         # Layout the graph
-        g.layout(prog='dot')
+        self.pgv_graph.layout(prog='neato', args=layout_args)
 
         # Draw the graph to a byte buffer
         buffer = io.BytesIO()
-        g.draw(buffer, format='png')
+        self.pgv_graph.draw(buffer, format='png')
         self.buffer_dict[round_num] = buffer
         print(f'Created plot for simulation {simulation_name} in round {round_num}')
 
