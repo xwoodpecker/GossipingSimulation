@@ -577,6 +577,9 @@ class GossipRunner:
         self.num_rounds = round_num
 
     def stop_node_applications(self):
+        """
+        Stop all node applications over GRPC.
+        """
         print(f"Stopping node applications...")
         for node in self.stub_dict: 
             response = self.stub_dict[node].StopApplication(gossip_pb2.StopApplicationRequest())
