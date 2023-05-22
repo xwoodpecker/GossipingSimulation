@@ -27,7 +27,7 @@
 ---------------------------------------------------------------
 * holme and kim powerlaw cluster graph
 https://networkx.org/documentation/stable/reference/generated/networkx.generators.random_graphs.powerlaw_cluster_graph.html#networkx.generators.random_graphs.powerlaw_cluster_graph
-nu,ber of nodes
+number of nodes
 number of  edges
 prob. of adding a triangle after random edge
 
