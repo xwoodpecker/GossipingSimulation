@@ -1,5 +1,7 @@
 import io
 import os
+import sys
+
 import click
 import networkx as nx
 import numpy as np
@@ -214,7 +216,7 @@ def prompt_p_inter():
 
 
 def prompt_simple_equal_comms():
-    return click.confirm('Should the communities be of equal size?')
+    return click.confirm('Should the communities be of equal size?', default=True)
 
 
 def get_params_simple_graph():
@@ -256,7 +258,7 @@ def get_distribution(distribution_name):
 
 
 def prompt_degree():
-    return click.prompt('Enter the graph degree', type=int)
+    return click.prompt('Enter the graph degree', type=int, default=1)
 
 
 def prompt_modularity():
@@ -398,6 +400,8 @@ def get_get_end_params_func(graph_type):
 
 
 def get_simple_graph_name(node_count, comm_count, p_intra, p_inter, equal_sized):
+    p_intra = np.round(p_intra, decimals=4)
+    p_inter = np.round(p_inter, decimals=4)
     eq_str = 'eq' if equal_sized else 'ne'
     return f'SIMPL_n{node_count}_c{comm_count}_{eq_str}_p1_{p_intra}_p2_{p_inter}'
 
@@ -513,6 +517,9 @@ def add_random_inter_community_edge(graph, i, j):
 
 
 def get_scale_free_graph_name(node_count, alpha, beta, gamma):
+    alpha = np.round(alpha, decimals=4)
+    beta = np.round(beta, decimals=4)
+    gamma = np.round(gamma, decimals=4)
     return f'SCALE_n{node_count}_a{alpha}_b{beta}_g{gamma}'
 
 
@@ -568,16 +575,20 @@ def get_long_distribution_string(distribution):
 
 
 def get_complex_graph_name(node_count, degree, comm_count, modularity, degree_distribution, module_distribution):
+    modularity = np.round(modularity, decimals=4)
     dd = get_short_distribution_string(degree_distribution)
     md = get_short_distribution_string(module_distribution)
     return f'COMPL_n{node_count}_d{degree}_c{comm_count}_m_{modularity}_dd{dd}_md{md}'
 
 
 def generate_complex_graph(node_count, degree, comm_count, modularity, degree_distribution, module_distribution):
-    degree_function = sg.poisson_sequence
-    module_function = sg.regular_sequence
-    graph = rmg.generate_modular_networks(node_count, degree_function, module_function, modularity, comm_count, degree)
-    return graph
+    try:
+        graph = rmg.generate_modular_networks(node_count, degree_distribution, module_distribution, modularity,
+                                              comm_count, degree)
+        return graph
+    except nx.NetworkXError as nwe:
+        print('Error in generate_modular_networks library function call:', str(nwe))
+        sys.exit(0)
 
 
 def get_barabasi_albert_graph_name(node_count, edge_degree):
@@ -623,6 +634,9 @@ def get_graph_name(graph_type, graph_params):
 
 
 def generate_graph_resource_yaml(name, adjacency_list, graph_type, graph_properties, value_list=None):
+    for key, value in graph_properties.items():
+        if isinstance(value, float):
+            graph_properties[key] = round(value, 4)
     resource_dict = {
         'apiVersion': 'gossip.io/v1',
         'kind': 'Graph',
@@ -659,18 +673,66 @@ def get_graph_type_long(graph_type):
     return long_graph_types.get(graph_type)
 
 
+CLICK_COUNT_HELP_TEXT = 'The number of graphs to be created\n M or MxN input with M as the number of different ' \
+                        'parameters\n and N as the number of graphs generated for each set of parameters '
+
+CLICK_COUNT_PROMPT_TEXT = 'Enter the number of graphs that are to be generated\n' \
+                          'Either enter a single number M or an MxN input\n' \
+                          'with M as the number of different parameters\n' \
+                          'and N as the number of graphs generated for each set of parameters'
+
+CLICK_GRAPH_TYPE_HELP_TEXT = f'The graph type (simple, complex, scale-free or barabasi-albert) for the created graph'
+
+CLICK_GRAPH_TYPE_PROMPT_TEXT = 'Choose graph type:\n' \
+                               f'* [{GRAPH_TYPE_SIMPLE_SHORT}] : Simple modular graph creation ' \
+                               'based on inter/intra-edge generation\n' \
+                               f'* [{GRAPH_TYPE_COMPLEX_SHORT}] : Complex modular graph creation ' \
+                               'based on desired modularity\n' \
+                               f'* [{GRAPH_TYPE_SCALE_FREE_SHORT}] : Scale-free graph creation\n' \
+                               f'* [{GRAPH_TYPE_BARABASI_ALBERT_SHORT}] : Scale-free graph creation\n'
+
+
 @click.command()
+@click.option('--count',
+              type=str,
+              help=CLICK_COUNT_HELP_TEXT,
+              prompt=CLICK_COUNT_PROMPT_TEXT)
 @click.option('--graph-type',
               type=click.Choice([f'{GRAPH_TYPE_SIMPLE_SHORT}', f'{GRAPH_TYPE_COMPLEX_SHORT}',
                                  f'{GRAPH_TYPE_SCALE_FREE_SHORT}', f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}']),
-              help=f'The graph type (simple, complex, scale-free or barabasi-albert) for the created graph',
-              prompt='Choose graph type:\n' +
-                     f'* [{GRAPH_TYPE_SIMPLE_SHORT}] : Simple modular graph creation based on inter/intra-edge '
-                     f'generation\n' +
-                     f'* [{GRAPH_TYPE_COMPLEX_SHORT}] : Complex modular graph creation based on target modularity\n' +
-                     f'* [{GRAPH_TYPE_SCALE_FREE_SHORT}] : Scale-free graph creation\n' +
-                     f'* [{GRAPH_TYPE_BARABASI_ALBERT_SHORT}] : Scale-free graph creation\n')
-def generate_graphs(graph_type):
+              help=CLICK_GRAPH_TYPE_HELP_TEXT,
+              prompt=CLICK_GRAPH_TYPE_PROMPT_TEXT)
+def generate_graphs(count, graph_type):
+    sameParams = False
+    run = True
+    while run:
+        try:
+            if 'x' in count:
+                M, N = count.split('x')
+                N = int(N)
+                M = int(M)
+                # Check if N and M are positive integers
+                if N > 0 and M > 0:
+                    run = False
+                else:
+                    print("M and N must be positive integers. Please try again.")
+            else:
+                N = int(count)
+                # Check if N and is a positive integers
+                if N > 0:
+                    sameParams = True
+                    run = False
+                else:
+                    print("N must be a positive integers. Please try again.")
+
+        except ValueError as ve:
+            print("Invalid input format. Please enter valid 'NxM' values.")
+        finally:
+            if run:
+                count = click.prompt(
+                    CLICK_COUNT_PROMPT_TEXT,
+                    type=str, default="5x10")
+
     get_params_func = get_get_params_func(graph_type)
     get_graph_properties_func = get_get_graph_properties_func(graph_type)
     get_end_params_func = get_get_end_params_func(graph_type)
@@ -680,92 +742,63 @@ def generate_graphs(graph_type):
     graph_properties = [get_graph_properties_func(*graph_params)]
     graphs = [(get_graph_name(graph_type, graph_params), graph)]
 
-    if click.confirm('Do you want to initialize more graphs?'):
+    for _ in range(0, N - 1):
+        graph = create_graph_func(*graph_params)
+        graph_properties.append(get_graph_properties_func(*graph_params))
+        graphs.append((get_graph_name(graph_type, graph_params), graph))
 
-        same_params = click.confirm('Do you want to initialize all graphs with the same parameters?')
-        if same_params:
-            count = click.prompt('Enter the number of graphs that are to be generated', type=int, default=1)
-            for _ in range(0, count - 1):
-                graph = create_graph_func(*graph_params)
-                graph_properties.append(get_graph_properties_func(*graph_params))
-                graphs.append((get_graph_name(graph_type, graph_params), graph))
-        else:
-            while True:
-                try:
-                    nxm = click.prompt(
-                        'Enter "NxM" with N as the number of different parameters and M as the number of generated '
-                        'graphs with those parameters',
-                        type=str, default="10x1")
-                    N, M = nxm.split('x')
-                    N = int(N)
-                    M = int(M)
-
-                    # Check if N and M are positive integers
-                    if N > 0 and M > 0:
-                        break
-                    else:
-                        print("N and M must be positive integers. Please try again.")
-                except ValueError:
-                    print("Invalid input format. Please enter valid 'NxM' values.")
-
+    if sameParams is False:
+        one_by_one = click.confirm('Do you want to provide the different parameters one by one?', default=False)
+        if one_by_one:
             for _ in range(0, M - 1):
-                graph = create_graph_func(*graph_params)
-                graph_properties.append(get_graph_properties_func(*graph_params))
-                graphs.append((get_graph_name(graph_type, graph_params), graph))
-
-            one_by_one = click.confirm('Do you want to provide the different parameters one by one?')
-            if one_by_one:
+                graph_params = get_params_func()
                 for _ in range(0, N):
-                    graph_params = get_params_func()
-                    for _ in range(0, M):
-                        graph = create_graph_func(*graph_params)
-                        graph_properties.append(get_graph_properties_func(*graph_params))
-                        graphs.append((get_graph_name(graph_type, graph_params), graph))
-            else:
-                print('Specify end parameters of the last set of graphs, values in between will be interpolated.')
-                end_params = get_end_params_func()
+                    graph = create_graph_func(*graph_params)
+                    graph_properties.append(get_graph_properties_func(*graph_params))
+                    graphs.append((get_graph_name(graph_type, graph_params), graph))
+        else:
+            print('Specify end parameters of the last set of graphs, values in between will be interpolated.')
+            end_params = get_end_params_func()
 
-                param_lists = []
-                for i in range(0, len(graph_params)):
-                    if i < len(end_params):
-                        start = graph_params[i]
-                        end = end_params[i]
-                        values = np.linspace(start, end, N)[1:]
-                        if isinstance(start, int) and isinstance(end, int):
-                            values = values.astype(int)
-                        else:
-                            values = np.round(values, decimals=4)
-                    else:
-                        values = np.full(N - 1, graph_params[i])
-                    param_lists.append(values)
+            param_lists = []
+            for i in range(0, len(graph_params)):
+                if i < len(end_params):
+                    start = graph_params[i]
+                    end = end_params[i]
+                    values = np.linspace(start, end, M)[1:]
+                    if isinstance(start, int) and isinstance(end, int):
+                        values = values.astype(int)
+                else:
+                    values = np.full(M, graph_params[i])
+                param_lists.append(values)
 
-                # Transpose the input array to align the i-th elements from each inner array
-                transposed_params = np.transpose(np.array(param_lists, dtype='object'))
-                # Create a new structure with tuples of i-th elements from each inner array
-                graph_params_list = [tuple(row) for row in transposed_params]
+            # Transpose the input array to align the i-th elements from each inner array
+            transposed_params = np.transpose(np.array(param_lists, dtype='object'))
+            # Create a new structure with tuples of i-th elements from each inner array
+            graph_params_list = [tuple(row) for row in transposed_params]
 
-                for params in graph_params_list:
-                    for _ in range(0, M):
-                        graph = create_graph_func(*params)
-                        graph_properties.append(get_graph_properties_func(*params))
-                        graphs.append((get_graph_name(graph_type, params), graph))
+            for params in graph_params_list:
+                for _ in range(0, N):
+                    graph = create_graph_func(*params)
+                    graph_properties.append(get_graph_properties_func(*params))
+                    graphs.append((get_graph_name(graph_type, params), graph))
 
-        # all graphs are created
-        # rename duplicate graph names
-        renamed_graphs = []
-        name_counts = {}
-        for name, graph in graphs:
-            if name not in name_counts:
-                # First occurrence of the name
-                name_counts[name] = 1
-                renamed_graphs.append((name, graph))
-            else:
-                # Duplicate name found
-                count = name_counts[name]
-                new_name = f"{name}_{count + 1}"
-                renamed_graphs.append((new_name, graph))
-                name_counts[name] += 1
-        graphs = renamed_graphs
+    # all graphs are created
+    # rename duplicate graph names
+    renamed_graphs = []
+    name_counts = {}
+    for name, graph in graphs:
+        if name not in name_counts:
+            # First occurrence of the name
+            name_counts[name] = 1
+            renamed_graphs.append((name, graph))
+        else:
+            # Duplicate name found
+            count = name_counts[name]
+            new_name = f"{name}_{count + 1}"
+            renamed_graphs.append((new_name, graph))
+            name_counts[name] += 1
+    graphs = renamed_graphs
 
     visualize = click.confirm('Do you want to see the created graphs?')
     if visualize:
@@ -776,7 +809,7 @@ def generate_graphs(graph_type):
             plot(graph, num_communities, use_louvain=True)
 
     choice = click.prompt('Do you want to save the graphs as adjacency lists or create a k8s graph resource?',
-                          type=click.Choice(['adj', 'k8s']))
+                          type=click.Choice(['adj', 'k8s']), default='k8s')
     if choice == 'adj':
         prefix = click.prompt('Enter the file name prefix', type=str, default="")
         for name, graph in graphs:
@@ -787,11 +820,13 @@ def generate_graphs(graph_type):
 
         value_list = None
         choice = click.prompt(
-            'Do you want to assign random node values, use the node number as its value or ' +
-            'assign custom values yourself?',
-            type=click.Choice(['rand', 'own', 'custom']))
+            'Do you want to: \n' +
+            '- let the nodes choose their node values [none],\n' +
+            '- assign the node number as its value [num]\n' +
+            'assign custom values yourself? [cust]',
+            type=click.Choice(['none', 'number', 'custom']), default='none')
         node_count = max(graph[1].number_of_nodes() for graph in graphs)
-        if choice == 'own':
+        if choice == 'number':
             value_list = list(range(0, node_count))
         if choice == 'custom':
             while True:
@@ -802,9 +837,12 @@ def generate_graphs(graph_type):
                 else:
                     print('Not the right number of values. Please try again.')
 
-        choice = click.prompt('Do you want to use default prefixes, add a prefix to the default prefix or ' +
-                              'specify an own name prefix?',
-                              type=click.Choice(['default', 'add', 'own']))
+        choice = click.prompt(
+            'Do you want to: \n' +
+            '- use default prefixes [default]\n' +
+            '- add a prefix to the default prefix [add]\n' +
+            '- specify an own name prefix? [own]',
+            type=click.Choice(['default', 'add', 'own']), default="default")
         if choice == 'add':
             added_prefix = click.prompt('Enter the name prefix to add', type=str)
         if choice == 'own':
@@ -815,8 +853,7 @@ def generate_graphs(graph_type):
             if choice == 'add':
                 name_string = added_prefix + name
             elif choice == 'own':
-
-                name_string = f'{own_prefix}_{i+1}'
+                name_string = f'{own_prefix}_{i + 1}'
             else:
                 name_string = name
 
