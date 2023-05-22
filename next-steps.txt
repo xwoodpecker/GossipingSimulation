@@ -19,7 +19,10 @@
 !!! - refactor runner visualization similar to generator visualization
     (maybe put plot in sharedclass)
     use node mean value for community nodes when doing compact visualization
+-> DONE (TEST! change 100 to smaller number and verify locally)
 - add comments to lots of stuff
+- select node value "own" not needed (default behavior) when randomInitialization is set to false and no node list
+is provided
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
