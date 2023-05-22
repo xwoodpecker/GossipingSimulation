@@ -16,7 +16,8 @@ import random_modular_generator_variable_modules as rmg
 import sequence_generator as sg
 import yaml
 
-
+# the code below can be used to generate really big images 
+# in case of a raising exception
 # from PIL.ImageFile import ImageFile
 # can be used to allow bigger images
 # Increase the limit of pixels
@@ -24,12 +25,24 @@ import yaml
 # Image.MAX_IMAGE_PIXELS = None
 
 
-def make_fully_interconnected(graph):
+def make_fully_interconnected(graph):    
+    """
+    Make the graph fully interconnected by adding edges between components.
+
+    Args:
+        graph (NetworkX graph): The graph to make fully interconnected.
+
+    Returns:
+        NetworkX graph: The fully interconnected graph.
+    """
+    # components are non-connected graph partitions
     components = list(nx.connected_components(graph))
     num_components = len(components)
 
+    # Stop if the graph is already fully interconnected
     if num_components < 2:
-        return graph  # No need to add edges if the graph is already fully interconnected
+        # No need to add edges if the graph is already fully interconnected
+        return graph  
 
     # Randomly select two components to connect
     component1 = random.choice(components)
@@ -46,6 +59,7 @@ def make_fully_interconnected(graph):
     new_graph = nx.Graph(graph)
     new_graph.add_edge(node1, node2)
 
+    # recursive call of make_fully_interconnected
     return make_fully_interconnected(new_graph)
 
 
@@ -126,10 +140,10 @@ def plot(graph, num_comm=0, use_louvain=False):
         None
     """
     # Draw the graph using Graphviz
-    layout_args = ''
     g = pgv.AGraph(directed=False)
 
-    if graph.number_of_nodes() <= 100:
+    # check if the graph has more nodes than the normal plotting allows
+    if graph.number_of_nodes() <= MAXIMUM_NODE_NUMBER_NORMAL_PLOT:
         if num_comm > 0:
             colors = generate_colors(num_comm)
             # Assign a color to each node based on its community
@@ -139,6 +153,7 @@ def plot(graph, num_comm=0, use_louvain=False):
                 if community_id not in community_colors:
                     community_colors[community_id] = colors.pop(0)
                 node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
+                # add node to the graph with the community color
                 g.add_node(node, style='filled', fillcolor=node_color)
 
         # Add edges to the graph
@@ -146,11 +161,11 @@ def plot(graph, num_comm=0, use_louvain=False):
             g.add_edge(edge[0], edge[1])
     else:
         if num_comm > 0:
-            layout_args = '-Goverlap=prism'
             colors = generate_colors(num_comm)
             # Add communities as nodes to the new graph
             for i in range(0, num_comm):
                 node_color = '#' + ''.join(format(c, '02x') for c in colors.pop(0))
+                # add a single node to the graph for this community
                 g.add_node(i, style='filled', fillcolor=node_color)
 
             # Add edges between connected communities
@@ -165,7 +180,7 @@ def plot(graph, num_comm=0, use_louvain=False):
             return
 
     # Layout the graph
-    g.layout(prog='neato', args=layout_args)
+    g.layout(prog='neato')
 
     # Draw the graph to a byte buffer
     buffer = io.BytesIO()
@@ -200,26 +215,63 @@ def save_graph_as_adj_list(graph, name):
 
 
 def prompt_node_count():
+    """
+    Prompt the user to enter the total number of nodes in the graph.
+
+    Returns:
+        int: The total number of nodes entered by the user.
+    """
     return click.prompt('Enter the total number of nodes in the graph', type=int)
 
 
 def prompt_comm_count():
+    """
+    Prompt the user to enter the number of communities in the graph.
+
+    Returns:
+        int: The number of communities entered by the user.
+    """
     return click.prompt('Enter the number of communities in the graph', type=int)
 
 
 def prompt_p_intra():
+    """
+    Prompt the user to enter the probability of intra-community edges.
+
+    Returns:
+        float: The probability of intra-community edges entered by the user.
+    """
     return click.prompt('Enter the probability of intra-community edges (0 to 1)', type=float, default=0.4)
 
 
 def prompt_p_inter():
+    """
+    Prompt the user to enter the probability of inter-community edges.
+
+    Returns:
+        float: The probability of inter-community edges entered by the user.
+    """
     return click.prompt('Enter the probability of inter-community edges (0 to 1)', type=float, default=0.001)
 
 
 def prompt_simple_equal_comms():
+    """
+    Prompt the user to choose whether the communities should be of equal size.
+
+    Returns:
+        bool: True if the communities should be of equal size, False otherwise.
+    """
     return click.confirm('Should the communities be of equal size?', default=True)
 
 
 def get_params_simple_graph():
+    """
+    Prompt the user to enter parameters for generating a simple graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count, community count, intra-community edge probability,
+               inter-community edge probability, and whether communities should be of equal size.
+    """
     node_count = prompt_node_count()
     comm_count = prompt_comm_count()
     equal_sized = prompt_simple_equal_comms()
@@ -229,6 +281,19 @@ def get_params_simple_graph():
 
 
 def get_graph_properties_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized):
+    """
+    Get the graph properties based on the provided parameters for generating a simple graph.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        comm_count (int): The number of communities in the graph.
+        p_intra (float): The probability of intra-community edges.
+        p_inter (float): The probability of inter-community edges.
+        equal_sized (bool): True if the communities should be of equal size, False otherwise.
+
+    Returns:
+        dict: A dictionary containing the graph properties.
+    """
     return {
         'nodeCount': node_count,
         'communityCount': comm_count,
@@ -238,7 +303,14 @@ def get_graph_properties_simple_graph(node_count, comm_count, p_intra, p_inter, 
     }
 
 
-def get_end_params_simple_graph():
+def get_end_params_simple_graph():#
+    """
+    Prompt the user to enter the end parameters for generating a simple graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count, community count, intra-community edge probability,
+               and inter-community edge probability.
+    """
     node_count = prompt_node_count()
     comm_count = prompt_comm_count()
     p_intra = prompt_p_intra()
@@ -247,6 +319,15 @@ def get_end_params_simple_graph():
 
 
 def get_distribution(distribution_name):
+    """
+    Get the graph distribution function based on the provided distribution name.
+
+    Args:
+        distribution_name (str): The name of the distribution.
+
+    Returns:
+        function: The corresponding graph distribution function.
+    """
     distributions = {
         POISSON_DISTRIBUTION_NAME: sg.poisson_sequence,
         REGULAR_DISTRIBUTION_NAME: sg.regular_sequence,
@@ -258,14 +339,32 @@ def get_distribution(distribution_name):
 
 
 def prompt_degree():
+    """
+    Prompt the user to enter the graph degree.
+
+    Returns:
+        int: The entered graph degree.
+    """
     return click.prompt('Enter the graph degree', type=int, default=1)
 
 
 def prompt_modularity():
+    """
+    Prompt the user to enter the graph modularity.
+
+    Returns:
+        float: The entered graph modularity value.
+    """
     return click.prompt('Enter the graph modularity (0 to 1)', type=float, default=0.8)
 
 
 def prompt_degree_distribution():
+    """
+    Prompt the user to enter the degree distribution function.
+
+    Returns:
+        str: The entered degree distribution function name.
+    """
     return click.prompt('Enter the degree distribution function',
                         type=click.Choice([REGULAR_DISTRIBUTION_NAME, POISSON_DISTRIBUTION_NAME,
                                            GEOMETRIC_DISTRIBUTION_NAME,
@@ -274,6 +373,12 @@ def prompt_degree_distribution():
 
 
 def prompt_community_distribution():
+    """
+    Prompt the user to enter the community distribution function.
+
+    Returns:
+        str: The entered community distribution function name.
+    """
     return click.prompt('Enter the community distribution function',
                         type=click.Choice(
                             [REGULAR_DISTRIBUTION_NAME, POISSON_DISTRIBUTION_NAME,
@@ -282,6 +387,13 @@ def prompt_community_distribution():
 
 
 def get_params_complex_graph():
+    """
+    Prompt the user to enter parameters for generating a complex graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count, degree, community count, modularity,
+               degree distribution function, and community distribution function.
+    """
     node_count = prompt_node_count()
     degree = prompt_degree()
     comm_count = prompt_comm_count()
@@ -295,6 +407,20 @@ def get_params_complex_graph():
 
 def get_graph_properties_complex_graph(node_count, degree, comm_count, modularity, degree_distribution,
                                        community_distribution):
+    """
+    Get the graph properties based on the provided parameters for generating a complex graph.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        degree (int): The degree of the graph.
+        comm_count (int): The number of communities in the graph.
+        modularity (float): The desired modularity value of the graph.
+        degree_distribution (function): The degree distribution function.
+        community_distribution (function): The community distribution function.
+
+    Returns:
+        dict: A dictionary containing the graph properties.
+    """
     return {
         'nodeCount': node_count,
         'degree': degree,
@@ -306,6 +432,12 @@ def get_graph_properties_complex_graph(node_count, degree, comm_count, modularit
 
 
 def get_end_params_complex_graph():
+    """
+    Prompt the user to enter the end parameters for generating a complex graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count, degree, community count, and modularity.
+    """
     node_count = prompt_node_count()
     degree = prompt_degree()
     comm_count = prompt_comm_count()
@@ -315,18 +447,42 @@ def get_end_params_complex_graph():
 
 
 def prompt_alpha():
+    """
+    Prompt the user to enter the alpha value.
+
+    Returns:
+        float: The entered alpha value.
+    """
     return click.prompt('Enter alpha (0-1)', type=float, default=0.9)
 
 
 def prompt_beta():
+    """
+    Prompt the user to enter the beta value.
+
+    Returns:
+        float: The entered beta value.
+    """
     return click.prompt('Enter beta (0-1)', type=float, default=0.05)
 
 
 def prompt_gamma():
+    """
+    Prompt the user to enter the gamma value.
+
+    Returns:
+        float: The entered gamma value.
+    """
     return click.prompt('Enter gamma (0-1)', type=float, default=0.05)
 
 
 def get_params_scale_free_graph():
+    """
+    Prompt the user to enter parameters for generating a scale-free graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count, alpha, beta, and gamma.
+    """
     node_count = prompt_node_count()
     print('Now alpha, betta and gamma can be defined, their sum must be 1')
     while True:
@@ -341,6 +497,18 @@ def get_params_scale_free_graph():
 
 
 def get_graph_properties_scale_free_graph(node_count, alpha, beta, gamma):
+    """
+    Get the graph properties based on the provided parameters for generating a scale-free graph.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        alpha (float): The alpha value.
+        beta (float): The beta value.
+        gamma (float): The gamma value.
+
+    Returns:
+        dict: A dictionary containing the graph properties.
+    """
     return {
         'nodeCount': node_count,
         'alpha': alpha,
@@ -350,16 +518,39 @@ def get_graph_properties_scale_free_graph(node_count, alpha, beta, gamma):
 
 
 def prompt_edge_degree():
+    """
+    Prompt the user to enter the edge degree in the graph.
+
+    Returns:
+        int: The entered edge degree.
+    """
     return click.prompt('Enter the edge degree in the graph', type=int, default=1)
 
 
 def get_params_barabasi_albert_graph():
+    """
+    Prompt the user to enter parameters for generating a Barabasi-Albert graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count and edge degree.
+    """
+
     node_count = prompt_node_count()
     edge_degree = prompt_edge_degree()
     return node_count, edge_degree
 
 
 def get_graph_properties_barabasi_albert_graph(node_count, edge_degree):
+    """
+    Get the graph properties based on the provided parameters for generating a Barabasi-Albert graph.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        edge_degree (int): The edge degree in the graph.
+
+    Returns:
+        dict: A dictionary containing the graph properties.
+    """
     return {
         'nodeCount': node_count,
         'edgeDegree': edge_degree
@@ -367,6 +558,16 @@ def get_graph_properties_barabasi_albert_graph(node_count, edge_degree):
 
 
 def get_get_params_func(graph_type):
+    """
+    Get the corresponding get_params function based on the graph type.
+
+    Args:
+        graph_type (str): The graph type.
+
+    Returns:
+        function: The get_params function for the specified graph type.
+    """
+
     get_params_funcs = {
         GRAPH_TYPE_SIMPLE_SHORT: get_params_simple_graph,
         GRAPH_TYPE_COMPLEX_SHORT: get_params_complex_graph,
@@ -378,6 +579,15 @@ def get_get_params_func(graph_type):
 
 
 def get_get_graph_properties_func(graph_type):
+    """
+    Get the corresponding get_graph_properties function based on the graph type.
+
+    Args:
+        graph_type (str): The graph type.
+
+    Returns:
+        function: The get_graph_properties function for the specified graph type.
+    """
     get_graph_properties_funcs = {
         GRAPH_TYPE_SIMPLE_SHORT: get_graph_properties_simple_graph,
         GRAPH_TYPE_COMPLEX_SHORT: get_graph_properties_complex_graph,
@@ -389,6 +599,15 @@ def get_get_graph_properties_func(graph_type):
 
 
 def get_get_end_params_func(graph_type):
+    """
+    Get the corresponding get_end_params function based on the graph type.
+
+    Args:
+        graph_type (str): The graph type.
+
+    Returns:
+        function: The get_end_params function for the specified graph type.
+    """
     get_end_params_funcs = {
         GRAPH_TYPE_SIMPLE_SHORT: get_end_params_simple_graph,
         GRAPH_TYPE_COMPLEX_SHORT: get_end_params_complex_graph,
@@ -400,6 +619,19 @@ def get_get_end_params_func(graph_type):
 
 
 def get_simple_graph_name(node_count, comm_count, p_intra, p_inter, equal_sized):
+    """
+    Generate a name for a simple graph based on the provided parameters.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        comm_count (int): The number of communities in the graph.
+        p_intra (float): The probability of an intra-community edge.
+        p_inter (float): The probability of an inter-community edge.
+        equal_sized (bool): Indicates if the communities are equal-sized.
+
+    Returns:
+        str: The generated graph name.
+    """
     p_intra = np.round(p_intra, decimals=4)
     p_inter = np.round(p_inter, decimals=4)
     eq_str = 'eq' if equal_sized else 'ne'
@@ -437,8 +669,6 @@ def generate_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized)
         sizes.append(remaining_nodes)
 
     # Generate a random modular graph
-    # this does not work (TODO: FIX)
-    # reproduce: node_count: 3, communities: 2, not equalized
     for i in range(comm_count):
         nodes = list(range(sum(sizes[:i]), sum(sizes[:i + 1])))
         size = sizes[i]
@@ -448,6 +678,7 @@ def generate_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized)
         graph.add_nodes_from(subgraph.nodes())
         graph.add_edges_from(subgraph.edges())
 
+    # set the community dictionary
     community_dict = {}
     for i in range(comm_count):
         nodes = list(range(sum(sizes[:i]), sum(sizes[:i + 1])))
@@ -517,6 +748,18 @@ def add_random_inter_community_edge(graph, i, j):
 
 
 def get_scale_free_graph_name(node_count, alpha, beta, gamma):
+    """
+    Generate a name for a scale-free graph based on the provided parameters.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        alpha (float): The alpha parameter for generating scale-free graphs.
+        beta (float): The beta parameter for generating scale-free graphs.
+        gamma (float): The gamma parameter for generating scale-free graphs.
+
+    Returns:
+        str: The generated graph name.
+    """
     alpha = np.round(alpha, decimals=4)
     beta = np.round(beta, decimals=4)
     gamma = np.round(gamma, decimals=4)
@@ -553,6 +796,15 @@ def generate_scale_free_graph(node_count, alpha, beta, gamma):
 
 
 def get_short_distribution_string(distribution):
+    """
+    Get the short description of a degree distribution function.
+
+    Args:
+        distribution: The degree distribution function.
+
+    Returns:
+        str: The short description of the degree distribution function.
+    """
     short_descriptions = {
         sg.poisson_sequence: 'P',
         sg.regular_sequence: 'R',
@@ -564,6 +816,15 @@ def get_short_distribution_string(distribution):
 
 
 def get_long_distribution_string(distribution):
+    """
+    Get the long description of a degree distribution function.
+
+    Args:
+        distribution: The degree distribution function.
+
+    Returns:
+        str: The long description of the degree distribution function.
+    """
     long_descriptions = {
         sg.poisson_sequence: 'PoissonSequence',
         sg.regular_sequence: 'RegularSequence',
@@ -575,6 +836,20 @@ def get_long_distribution_string(distribution):
 
 
 def get_complex_graph_name(node_count, degree, comm_count, modularity, degree_distribution, module_distribution):
+    """
+    Generate a name for a complex graph based on the provided parameters.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        degree (int): The degree of the graph.
+        comm_count (int): The number of communities in the graph.
+        modularity (float): The modularity of the graph.
+        degree_distribution: The degree distribution function.
+        module_distribution: The community distribution function.
+
+    Returns:
+        str: The generated graph name.
+    """
     modularity = np.round(modularity, decimals=4)
     dd = get_short_distribution_string(degree_distribution)
     md = get_short_distribution_string(module_distribution)
@@ -582,6 +857,20 @@ def get_complex_graph_name(node_count, degree, comm_count, modularity, degree_di
 
 
 def generate_complex_graph(node_count, degree, comm_count, modularity, degree_distribution, module_distribution):
+    """
+    Generate a complex graph based on the provided parameters.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        degree (int): The degree of the graph.
+        comm_count (int): The number of communities in the graph.
+        modularity (float): The modularity of the graph.
+        degree_distribution: The degree distribution function.
+        module_distribution: The community distribution function.
+
+    Returns:
+        networkx.Graph: The generated complex graph.
+    """
     try:
         graph = rmg.generate_modular_networks(node_count, degree_distribution, module_distribution, modularity,
                                               comm_count, degree)
@@ -592,6 +881,16 @@ def generate_complex_graph(node_count, degree, comm_count, modularity, degree_di
 
 
 def get_barabasi_albert_graph_name(node_count, edge_degree):
+    """
+    Generate a name for a Barabasi-Albert graph based on the provided parameters.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        edge_degree (int): The degree of each new node added during the graph construction.
+
+    Returns:
+        str: The generated graph name.
+    """
     return f'SCALE_n{node_count}_e{edge_degree}'
 
 
@@ -707,6 +1006,7 @@ def generate_graphs(count, graph_type):
     run = True
     while run:
         try:
+            # check which if single, multiple or mxn graph generation 
             if 'x' in count:
                 M, N = count.split('x')
                 N = int(N)
@@ -724,7 +1024,6 @@ def generate_graphs(count, graph_type):
                     run = False
                 else:
                     print("N must be a positive integers. Please try again.")
-
         except ValueError as ve:
             print("Invalid input format. Please enter valid 'NxM' values.")
         finally:
@@ -733,23 +1032,28 @@ def generate_graphs(count, graph_type):
                     CLICK_COUNT_PROMPT_TEXT,
                     type=str, default="5x10")
 
+    # set the functions for the chosen graph type
     get_params_func = get_get_params_func(graph_type)
     get_graph_properties_func = get_get_graph_properties_func(graph_type)
     get_end_params_func = get_get_end_params_func(graph_type)
     create_graph_func = get_creation_func(graph_type)
+    # get the graph parameters from user input
     graph_params = get_params_func()
-    graph = create_graph_func(*graph_params)
-    graph_properties = [get_graph_properties_func(*graph_params)]
-    graphs = [(get_graph_name(graph_type, graph_params), graph)]
 
-    for _ in range(0, N - 1):
+    graph_properties = []
+    graphs = []
+    # create N graphs for the given params
+    # add them and their properties to the arrays
+    for _ in range(0, N):
         graph = create_graph_func(*graph_params)
         graph_properties.append(get_graph_properties_func(*graph_params))
         graphs.append((get_graph_name(graph_type, graph_params), graph))
 
+    # in case of MxN graph creation
     if sameParams is False:
         one_by_one = click.confirm('Do you want to provide the different parameters one by one?', default=False)
         if one_by_one:
+            # ask each set of params one by one
             for _ in range(0, M - 1):
                 graph_params = get_params_func()
                 for _ in range(0, N):
@@ -758,10 +1062,13 @@ def generate_graphs(count, graph_type):
                     graphs.append((get_graph_name(graph_type, graph_params), graph))
         else:
             print('Specify end parameters of the last set of graphs, values in between will be interpolated.')
+            # ask for the last set of params
             end_params = get_end_params_func()
-
+            # interpolate the remaining parameters
             param_lists = []
             for i in range(0, len(graph_params)):
+                # some parameters can not be interpolated 
+                # and were therefore not prompted for the end params
                 if i < len(end_params):
                     start = graph_params[i]
                     end = end_params[i]
@@ -776,7 +1083,7 @@ def generate_graphs(count, graph_type):
             transposed_params = np.transpose(np.array(param_lists, dtype='object'))
             # Create a new structure with tuples of i-th elements from each inner array
             graph_params_list = [tuple(row) for row in transposed_params]
-
+            # create N graphs for each set of params
             for params in graph_params_list:
                 for _ in range(0, N):
                     graph = create_graph_func(*params)
@@ -800,12 +1107,16 @@ def generate_graphs(count, graph_type):
             name_counts[name] += 1
     graphs = renamed_graphs
 
-    visualize = click.confirm('Do you want to see the created graphs?')
+    # visualize in case the user wants to see the graphs
+    visualize = click.confirm('Do you want to see the created graphs?', default=False)
     if visualize:
         for name, graph in graphs:
+            # compute louvain communities
             num_communities = apply_louvain(graph)
+            # compute actual modularity based on the louvain communities
             computed_modularity = compute_modularity(graph, use_louvain=True)
             print(f'The graph has a computed modularity of {computed_modularity}.')
+            # plot the graph and show it
             plot(graph, num_communities, use_louvain=True)
 
     choice = click.prompt('Do you want to save the graphs as adjacency lists or create a k8s graph resource?',
@@ -818,17 +1129,11 @@ def generate_graphs(count, graph_type):
         # generate k8s graph resource .yaml file
         graph_type_string = get_graph_type_long(graph_type)
 
+        # optional value list for node value assignment
         value_list = None
-        choice = click.prompt(
-            'Do you want to: \n' +
-            '- let the nodes choose their node values [none],\n' +
-            '- assign the node number as its value [num]\n' +
-            'assign custom values yourself? [cust]',
-            type=click.Choice(['none', 'number', 'custom']), default='none')
-        node_count = max(graph[1].number_of_nodes() for graph in graphs)
-        if choice == 'number':
-            value_list = list(range(0, node_count))
-        if choice == 'custom':
+        custom = click.confirm('Do you want to set custom node values?', default=False)
+        if custom:
+            node_count = max(graph[1].number_of_nodes() for graph in graphs)
             while True:
                 value_list_input = click.prompt(f"Enter {node_count} numbers (separated by commas)")
                 value_list = [int(num.strip()) for num in value_list_input.split(",")]
@@ -837,6 +1142,7 @@ def generate_graphs(count, graph_type):
                 else:
                     print('Not the right number of values. Please try again.')
 
+        # optional name graph name setting
         choice = click.prompt(
             'Do you want to: \n' +
             '- use default prefixes [default]\n' +
@@ -850,13 +1156,14 @@ def generate_graphs(count, graph_type):
 
         i = 0
         for name, graph in graphs:
+            # create name string
             if choice == 'add':
                 name_string = added_prefix + name
             elif choice == 'own':
                 name_string = f'{own_prefix}_{i + 1}'
             else:
                 name_string = name
-
+            # create value list string
             value_list_string = None
             if value_list is not None:
                 value_list_string = ','.join(str(value) for value in value_list[:graph.number_of_nodes()])
@@ -865,13 +1172,16 @@ def generate_graphs(count, graph_type):
             if len(name_string) > 63:
                 name_string = name_string[-63:]
 
+            # adj list string and graph properties
             adjacency_list_string = ','.join(nx.generate_adjlist(graph))
             graph_props = graph_properties[i]
+            # generate yaml string
             yaml_string = generate_graph_resource_yaml(name_string,
                                                        adjacency_list_string,
                                                        graph_type_string,
                                                        graph_props,
                                                        value_list_string)
+            # save the graph resource as yaml file
             save_graph_resource_yaml(yaml_string, name_string)
             i += 1
 

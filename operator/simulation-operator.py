@@ -14,11 +14,24 @@ api = client.CoreV1Api()
 customs_api = client.CustomObjectsApi()
 
 @kopf.on.create('gossip.io', 'v1', 'simulations')
-def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
+def create_services_and_pods(spec, name, namespace, logger, **kwargs):
+    """
+    Create pods and services for a simulation resource object.
 
+    Args:
+        spec (dict): The specification of the simulation.
+        name (str): The name of the simulation.
+        namespace (str): The namespace in which the simulation is created.
+        logger (logging.Logger): The logger for logging messages.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        None
+    """
     graph_selector = spec.get('graphSelector', {})
     match_labels = graph_selector.get('matchLabels', {})
 
+    # Select graph from graphSelector
     graph_name = match_labels['app']
     graph_obj = customs_api.get_namespaced_custom_object('gossip.io', 'v1', namespace, 'graphs', graph_name)
     graph_spec = graph_obj['spec']
@@ -36,12 +49,15 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
     logger.info(f'The graph has the adjacency list: {adjacency_list}')
 
+    # get and sort all the nodes in the adj list
     entries = [split_str for split_str in split_adj_list]
     nodes = [entry[0] for entry in entries]
     nodes.sort()
 
     logger.info(f'The graph has the nodes: {nodes}')
 
+    # create a dictionary containing the nodes as keys 
+    # and their respective neighbors as values
     neighbors = {}
     for node in nodes:
         neighbors[node] = []
@@ -60,9 +76,22 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
     algorithm = spec.get('algorithm', DEFAULT_ALGORITHM)
     logger.info(f'Simulation running algorithm {algorithm}')
     
+
     def get_community_node_dict(partition):
+        """
+        Get dictionaries mapping community IDs to node IDs and vice versa.
+
+        Args:
+            partition (dict): A dictionary with node IDs as keys and community IDs as values.
+
+        Returns:
+            tuple: A tuple containing two dictionaries:
+                - node_community_dict (dict): A dictionary mapping node IDs to community IDs.
+                - community_node_dict (dict): A dictionary mapping community IDs to lists of node IDs.
+        """
         # create a dictionary with node ids as keys and community ids as values
         node_community_dict = {node: community_id for node, community_id in partition.items()}
+        # this dict contains the community ids as keys and the node ids as values
         community_node_dict = {}
         for node, community_id in partition.items():
             if community_id not in community_node_dict:
@@ -79,9 +108,13 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         partition = community_louvain.best_partition(graph)
         node_community_dict, community_node_dict = get_community_node_dict(partition)
 
+        # weighted factor algorithms use a factor to modify the probability 
+        # of selecting a partner inside or outside the community
         if algorithm in WEIGHTED_FACTOR_SET:
             factor = spec.get('factor', DEFAULT_FACTOR)
 
+        # community probability algorithms use statistical data for each selection
+        # of the next gossip partner
         if algorithm in COMMUNITY_PROBABILITIES_SET:
             # Compute the cluster sizes
             cluster_sizes = {}
@@ -91,6 +124,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                 cluster_sizes[cluster] += 1
 
             # Compute the community_probabilities for each cluster for each node
+            # It represents the certainty of the node belonging to the cluster
             community_probabilities = {}
             for node, cluster in partition.items():
                 if node not in community_probabilities:
@@ -102,28 +136,50 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                         community_probabilities[node][neighbor_cluster] = 0
                     community_probabilities[node][neighbor_cluster] += 1 / neighbor_count
 
+    # memory algorithms use a factor to modify the probability 
+    # of selecting a partner that has already been selected in a previous gossiping
     if algorithm in MEMORY_SET:
         prior_partner_factor = spec.get('priorPartnerFactor', DEFAULT_ALGORITHM)
     
+    # random initialization sets the node value of each node
     randomInitialization = spec.get('randomInitialization', True)
     if not randomInitialization:
         str_value_list = graph_spec.get('valueList', '').rstrip(',')
         split_value_list = str_value_list.split(',')
+        # set the values to the provided value list if the lengths match
         if len(split_value_list) == len(nodes):
             values = split_value_list
         else: 
             # set the node value to the node number
             values = nodes
+        # create a dict mapping nodes to their respective value
         node_values = {}
         for i in range(len(nodes)):
             node_values[nodes[i]] = values[i]
 
     pods = []
 
+
     def get_resource_name(simulation_name, node):
+        """
+        Generate a resource name based on the simulation name and node ID.
+
+        Args:
+            simulation_name (str): The name of the simulation.
+            node (str): The node ID.
+
+        Returns:
+            str: The generated resource name.
+        """
         return f'{name}-node-{node}'
     
-    def create_pods():
+    def create_node_pods():
+        """
+        Create node pods for the simulation.
+
+        Returns:
+            None
+        """
 
         # Create a dictionary to store the Pod names and their node number
         # Create a Pod for each node in the graph
@@ -140,16 +196,17 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             
             env = []
 
+            # set environment variables
             neighbors_str = ','.join([get_resource_name(name, n) for n in neighbors[node]])
             env.append(client.V1EnvVar(name=ENVIRONMENT_NEIGHBORS, value=neighbors_str))
-            
             env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
-
             env.append(client.V1EnvVar(name=ENVIRONMENT_RANDOM_INITIALIZATION, value=str(randomInitialization)))
             if not randomInitialization:
                 env.append(client.V1EnvVar(name=ENVIRONMENT_NODE_VALUE, value=str(node_values[node])))
 
+            # weighted factor algorithm specific environment variables
             if algorithm in WEIGHTED_FACTOR_SET:
+                 # set the community neighbors of the current node
                 community_id = node_community_dict[node]
                 community_nodes = community_node_dict[community_id]
                 # extract community and non-community neighbors
@@ -159,14 +216,14 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                 for neighbor_node in neighbor_nodes:
                     if neighbor_node in community_nodes:
                         community_neighbors.append(neighbor_node)
-                    #else:
-                    #    non_community_neighbors.append(neighbor_node)
 
                 community_neighbors_str = ','.join([get_resource_name(name, n) for n in community_neighbors])
                 env.append(client.V1EnvVar(name=ENVIRONMENT_COMMUNITY_NEIGHBORS, value=community_neighbors_str))
                 env.append(client.V1EnvVar(name=ENVIRONMENT_FACTOR, value=str(factor)))
 
+            # community probabilities algorithm specific environment variables
             if algorithm in COMMUNITY_PROBABILITIES_SET:
+                 # set the same community probabilities of the neighbors for the current node
                 community_id = node_community_dict[node]
                 neighbor_nodes = neighbors[node]
 
@@ -182,20 +239,22 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                 )
                 env.append(client.V1EnvVar(name=ENVIRONMENT_SAME_COMMUNITY_PROBABILITIES_NEIGHBORS, value=same_community_probabilities_neighbors_str))
 
+            # memory algorithm specific environment variables
             if algorithm in MEMORY_SET:
                 env.append(client.V1EnvVar(name=ENVIRONMENT_PRIOR_PARTNER_FACTOR, value=str(prior_partner_factor)))
 
-             # Create the container for the Pod
+            # Create the container for the Pod
             container = client.V1Container(
-            name=DOCKER_NODE_NAME,
-            image=DOCKER_NODE_IMAGE,
-            env=env,
-            ports=[
-                client.V1ContainerPort(container_port=TCP_SERVICE_PORT, name='tcp'),
-                client.V1ContainerPort(container_port=GRPC_SERVICE_PORT, name='grpc')
-            ]
-        )
+                name=DOCKER_NODE_NAME,
+                image=DOCKER_NODE_IMAGE,
+                env=env,
+                ports=[
+                    client.V1ContainerPort(container_port=TCP_SERVICE_PORT, name='tcp'),
+                    client.V1ContainerPort(container_port=GRPC_SERVICE_PORT, name='grpc')
+                ]
+            )
 
+            # define the pod
             pod = client.V1Pod(
                 metadata=client.V1ObjectMeta(
                     name=pod_name,
@@ -208,6 +267,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                 )
             )
             try:
+                # create the pod in the current namespace
                 api.create_namespaced_pod(namespace=namespace, body=pod)
                 logger.info(f'Pod {pod_name} created.')
                 pods.append(pod_name)
@@ -218,13 +278,18 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
    
     
-    def create_services():
+    def create_node_services():
+        """
+        Create pods for the simulation.
 
+        Returns:
+            None
+        """
         for node in nodes:
-
+            # Create a Service for this node
             service_name = get_resource_name(name, node)
 
-            # this does not work I think
+            
             labels = {
                 'app': 'gossip',
                 'simulation': name,
@@ -239,17 +304,18 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             }
             ports = [
             client.V1ServicePort(
-                name='tcp',
-                port=TCP_SERVICE_PORT,
-                target_port='tcp'
-            ),
-            client.V1ServicePort(
-                name='grpc',
-                port=GRPC_SERVICE_PORT,
-                target_port='grpc'
-            )
-        ]
+                    name='tcp',
+                    port=TCP_SERVICE_PORT,
+                    target_port='tcp'
+                ),
+                client.V1ServicePort(
+                    name='grpc',
+                    port=GRPC_SERVICE_PORT,
+                    target_port='grpc'
+                )
+            ]
 
+            # define the service
             service = client.V1Service(
                 metadata=client.V1ObjectMeta(
                     name=service_name,
@@ -263,6 +329,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             )
 
             try:
+                # create the service in the current namespace
                 api.create_namespaced_service(namespace=namespace, body=service)
                 logger.info(f'Service {service_name} created.')
             except ApiException as e:
@@ -270,16 +337,23 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         logger.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
 
+    # get simulation settings from the spec
     repetitions = spec.get('repetitions', 1)
     visualize = spec.get('visualize', False)
     simulationProperties = spec.get('simulationProperties', {})
-
+    # get graph settings frrom the graph spec
     graphType = graph_spec.get('graphType', 'normal')
     modularity = graph_spec.get('modularity', None)
     graphProperties = graph_spec.get('graphProperties', {})
 
     def create_runner_pod():
+        """
+        Create a runner pod for the simulation.
 
+        Returns:
+            None
+        """
+        # create the runner pod
         pod_name = f'{name}-runner'
 
         labels = {
@@ -289,16 +363,18 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
                     'node': 'runner'
                 }
         
+        # string representation of all created pods
         nodes_str = ','.join(pods)
         
         env = []
-
+        # set all necessary environment variables
         env.append(client.V1EnvVar(name=ENVIRONMENT_SIMULATION, value=name))
         env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
         env.append(client.V1EnvVar(name=ENVIRONMENT_REPETITIONS, value=str(repetitions)))
         env.append(client.V1EnvVar(name=ENVIRONMENT_ADJ_LIST, value=str_adj_list))
         env.append(client.V1EnvVar(name=ENVIRONMENT_NODES, value=nodes_str))
 
+        # node communities specific environment variable
         # set for graph highlighting in plots
         if algorithm in NODE_COMMUNITIES_SET:
             node_community_string = json.dumps(node_community_dict)
@@ -306,10 +382,11 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         env.append(client.V1EnvVar(name=ENVIRONMENT_VISUALIZE, value=str(visualize)))
 
+        # simulation properties for logging 
         simulation_properties = simulationProperties.copy()
         simulation_properties_string = json.dumps(simulation_properties)
         env.append(client.V1EnvVar(name=ENVIRONMENT_SIMULATION_PROPERTIES, value=simulation_properties_string))
-
+        # graph properties for logging
         graph_properties = graphProperties.copy()
         graph_properties['GraphType'] = graphType
         if modularity:
@@ -319,22 +396,23 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         # Create the container for the Pod
         container = client.V1Container(
-        name=DOCKER_RUNNER_NAME,
-        image=DOCKER_RUNNER_IMAGE,
-        env=env,
-        env_from=[
-            client.V1EnvFromSource(
-                config_map_ref=client.V1ConfigMapEnvSource(name=MINIO_CONFIGMAP_NAME)
-            ),
-            client.V1EnvFromSource(
-                secret_ref=client.V1SecretEnvSource(name=MINIO_SECRETS_NAME)
-            )
-        ],
-        ports=[
-            client.V1ContainerPort(container_port=GRPC_SERVICE_PORT, name='grpc')
-        ]
-    )
+            name=DOCKER_RUNNER_NAME,
+            image=DOCKER_RUNNER_IMAGE,
+            env=env,
+            env_from=[
+                    client.V1EnvFromSource(
+                        config_map_ref=client.V1ConfigMapEnvSource(name=MINIO_CONFIGMAP_NAME)
+                    ),
+                    client.V1EnvFromSource(
+                        secret_ref=client.V1SecretEnvSource(name=MINIO_SECRETS_NAME)
+                    )
+                ],
+            ports=[
+                    client.V1ContainerPort(container_port=GRPC_SERVICE_PORT, name='grpc')
+                ]
+        )
 
+        # define the runner pod
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
                 name=pod_name,
@@ -347,6 +425,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             )
         )
         try:
+            # create the runner pod
             api.create_namespaced_pod(namespace=namespace, body=pod)
             logger.info(f'Pod {pod_name} created')
         except ApiException as e:
@@ -356,7 +435,13 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
 
     def create_runner_service():
+        """
+        Create a runner service for the simulation.
 
+        Returns:
+            None
+        """
+        # create the runner service
         service_name = f'{name}-runner'
 
         labels = {
@@ -372,13 +457,14 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
             'node': 'runner'
         }
         ports = [
-        client.V1ServicePort(
-            name='grpc',
-            port=GRPC_SERVICE_PORT,
-            target_port='grpc'
-        )
-    ]
+            client.V1ServicePort(
+                name='grpc',
+                port=GRPC_SERVICE_PORT,
+                target_port='grpc'
+            )
+        ]
 
+        # define the runner service
         service = client.V1Service(
             metadata=client.V1ObjectMeta(
                 name=service_name,
@@ -392,6 +478,7 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         )
 
         try:
+            # create the runner service
             api.create_namespaced_service(namespace=namespace, body=service)
             logger.info(f'Service {service_name} created')
         except ApiException as e:
@@ -399,16 +486,22 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
 
         logger.info(f'Finished creating simulation runner service for simulation {name}.')
 
-    create_services()
+    # create services
+    create_node_services()
     create_runner_service()
-    create_pods()
+    # create node pods
+    create_node_pods()
     
+    # Set the labels used for selecting created node pods
     labels = {
             'app': 'gossip',
             'simulation': name,
             'graph': graph_name
         }
 
+    # wait until all node pods started before the runner pod is started
+    # this is done to prevent runner pod restarts 
+    # restarts can happen because the nodes need to be running for communication purposes
     logger.info(f'Waiting for node pods to start...')
     while True:
         # List all pods matching the specified labels
@@ -418,16 +511,28 @@ def create_pods_for_simulation(spec, name, namespace, logger, **kwargs):
         # Check if all pods are in the "Running" state
         if all(pod.status.phase == 'Running' for pod in node_pods.items):
             logger.info('All node pods are now running.')
-            break  # All pods are running, exit the loop
-        time.sleep(1)  # Wait for 1 second before checking again
+            # All pods are running, exit the loop
+            break  
+        # Wait for 1 second before checking again
+        time.sleep(1)  
 
     # All pods are running, create the runner pod
     create_runner_pod()
-    
+
     logger.info(f'Finished creating resources for simulation {name}.')
 
 @kopf.on.delete('gossip.io', 'v1', 'simulations')
 def delete_services_and_pods(body, **kwargs):
+    """
+    Delete services and pods associated with a simulation.
+
+    Args:
+        body (dict): The request body containing the information about the simulation to delete.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        None
+    """
     simulation_name = body['metadata']['name']
     namespace = body['metadata']['namespace']
     

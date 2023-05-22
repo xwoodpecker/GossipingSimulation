@@ -158,7 +158,7 @@ class GossipRunner:
 
         g = pgv.AGraph(directed=False)
 
-        if self.graph.number_of_nodes() <= 100:
+        if self.graph.number_of_nodes() <= MAXIMUM_NODE_NUMBER_NORMAL_PLOT:
             # Assign a color to each node based on its community
             idx = 0    
             community_colors = {}
@@ -203,7 +203,7 @@ class GossipRunner:
         # Draw the graph using Graphviz
         layout_args = ''
         
-        if self.graph.number_of_nodes() <= 100:
+        if self.graph.number_of_nodes() <= MAXIMUM_NODE_NUMBER_NORMAL_PLOT:
             for node, data in self.graph.nodes(data=True):
                 label = f"<{node}:<b>{data['value']}</b>>"
                 self.pgv_graph.get_node(node).attr['label'] = label
