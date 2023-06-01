@@ -635,7 +635,7 @@ def get_simple_graph_name(node_count, comm_count, p_intra, p_inter, equal_sized)
     p_intra = np.round(p_intra, decimals=4)
     p_inter = np.round(p_inter, decimals=4)
     eq_str = 'eq' if equal_sized else 'ne'
-    return f'SIMPL_n{node_count}_c{comm_count}_{eq_str}_p1_{p_intra}_p2_{p_inter}'
+    return f'{GRAPH_TYPE_SIMPLE_SHORT}-n{node_count}-c{comm_count}-{eq_str}-p1-{p_intra}-p2-{p_inter}'
 
 
 def generate_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized):
@@ -689,6 +689,7 @@ def generate_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized)
     nx.set_node_attributes(graph, community_dict, 'community')
 
     # guarantee that the graph is connected
+    # todo: this can be removed maybe
     for i in range(comm_count - 1):
         add_random_inter_community_edge(graph, i, i + 1)
 
@@ -763,7 +764,7 @@ def get_scale_free_graph_name(node_count, alpha, beta, gamma):
     alpha = np.round(alpha, decimals=4)
     beta = np.round(beta, decimals=4)
     gamma = np.round(gamma, decimals=4)
-    return f'SCALE_n{node_count}_a{alpha}_b{beta}_g{gamma}'
+    return f'{GRAPH_TYPE_SCALE_FREE_SHORT}-n{node_count}-a{alpha}-b{beta}-g{gamma}'
 
 
 def generate_scale_free_graph(node_count, alpha, beta, gamma):
@@ -806,10 +807,10 @@ def get_short_distribution_string(distribution):
         str: The short description of the degree distribution function.
     """
     short_descriptions = {
-        sg.poisson_sequence: 'P',
-        sg.regular_sequence: 'R',
-        sg.geometric_sequence: 'G',
-        sg.scalefree_sequence: 'S',
+        sg.poisson_sequence: 'p',
+        sg.regular_sequence: 'r',
+        sg.geometric_sequence: 'g',
+        sg.scalefree_sequence: 's',
     }
     description = short_descriptions.get(distribution)
     return description
@@ -853,7 +854,7 @@ def get_complex_graph_name(node_count, degree, comm_count, modularity, degree_di
     modularity = np.round(modularity, decimals=4)
     dd = get_short_distribution_string(degree_distribution)
     md = get_short_distribution_string(module_distribution)
-    return f'COMPL_n{node_count}_d{degree}_c{comm_count}_m_{modularity}_dd{dd}_md{md}'
+    return f'{GRAPH_TYPE_COMPLEX_SHORT}-n{node_count}-d{degree}-c{comm_count}-m{modularity}-dd{dd}-md{md}'
 
 
 def generate_complex_graph(node_count, degree, comm_count, modularity, degree_distribution, module_distribution):
@@ -891,7 +892,7 @@ def get_barabasi_albert_graph_name(node_count, edge_degree):
     Returns:
         str: The generated graph name.
     """
-    return f'SCALE_n{node_count}_e{edge_degree}'
+    return f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}-n{node_count}-e{edge_degree}'
 
 
 def generate_barabasi_albert_graph(node_count, edge_degree):
@@ -932,10 +933,27 @@ def get_graph_name(graph_type, graph_params):
     return func(*graph_params)
 
 
-def generate_graph_resource_yaml(name, adjacency_list, graph_type, graph_properties, value_list=None):
+def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, graph_properties, value_list=None):
+    # Custom Dumper Class to correctly enquote strings
+    class CustomDumper(yaml.Dumper):
+        pass
+
+    # just subclass the built-in str
+    class QuotedString(str):
+        pass
+
+    def quoted_scalar(dumper, data):
+        # a representer to force quotations on scalars
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+
+    # add the QuotedString custom type with a forced quotation representer to your dumper
+    CustomDumper.add_representer(QuotedString, quoted_scalar)
+
     for key, value in graph_properties.items():
         if isinstance(value, float):
             graph_properties[key] = round(value, 4)
+        graph_properties[key] = QuotedString(value)
+
     resource_dict = {
         'apiVersion': 'gossip.io/v1',
         'kind': 'Graph',
@@ -943,15 +961,16 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, graph_propert
             'name': name
         },
         'spec': {
-            'graphType': graph_type,
-            'graphProperties': graph_properties,
-            'adjacencyList': adjacency_list
+            'adjacencyList': QuotedString(adjacency_list),
+            'graphType': QuotedString(graph_type),
+            'modularity': QuotedString(round(modularity, 4)),
+            'graphProperties': graph_properties
         }
     }
     if value_list is not None:
-        resource_dict['spec']['valueList'] = value_list
+        resource_dict['spec']['valueList'] = f"'{value_list}'"
 
-    return yaml.dump(resource_dict, width=float("inf"))
+    return yaml.dump(resource_dict, Dumper=CustomDumper, width=float("inf"))
 
 
 def save_graph_resource_yaml(content, name):
@@ -988,7 +1007,7 @@ CLICK_GRAPH_TYPE_PROMPT_TEXT = 'Choose graph type:\n' \
                                f'* [{GRAPH_TYPE_COMPLEX_SHORT}] : Complex modular graph creation ' \
                                'based on desired modularity\n' \
                                f'* [{GRAPH_TYPE_SCALE_FREE_SHORT}] : Scale-free graph creation\n' \
-                               f'* [{GRAPH_TYPE_BARABASI_ALBERT_SHORT}] : Scale-free graph creation\n'
+                               f'* [{GRAPH_TYPE_BARABASI_ALBERT_SHORT}] : Barabási-Albert graph creation\n'
 
 
 @click.command()
@@ -1109,14 +1128,17 @@ def generate_graphs(count, graph_type):
 
     # visualize in case the user wants to see the graphs
     visualize = click.confirm('Do you want to see the created graphs?', default=False)
+
+    graph_modularity = {}
     if visualize:
         for name, graph in graphs:
+            # plot the graph and show it
             # compute louvain communities
             num_communities = apply_louvain(graph)
             # compute actual modularity based on the louvain communities
             computed_modularity = compute_modularity(graph, use_louvain=True)
             print(f'The graph has a computed modularity of {computed_modularity}.')
-            # plot the graph and show it
+            graph_modularity[graph] = computed_modularity
             plot(graph, num_communities, use_louvain=True)
 
     choice = click.prompt('Do you want to save the graphs as adjacency lists or create a k8s graph resource?',
@@ -1175,10 +1197,19 @@ def generate_graphs(count, graph_type):
             # adj list string and graph properties
             adjacency_list_string = ','.join(nx.generate_adjlist(graph))
             graph_props = graph_properties[i]
+
+            if not visualize:
+                apply_louvain(graph)
+                # compute actual modularity based on the louvain communities
+                modularity = compute_modularity(graph, use_louvain=True)
+            else:
+                modularity = graph_modularity[graph]
+
             # generate yaml string
             yaml_string = generate_graph_resource_yaml(name_string,
                                                        adjacency_list_string,
                                                        graph_type_string,
+                                                       modularity,
                                                        graph_props,
                                                        value_list_string)
             # save the graph resource as yaml file

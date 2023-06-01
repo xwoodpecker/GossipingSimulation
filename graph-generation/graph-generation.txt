@@ -1,3 +1,9 @@
+!!!! hypercubes (as models for man-made communication networks)
+!!!! random geometric graphs (model for wireless sensor networks)
+
+
+
+
 * simple graph generation (similar to Popularity graphs but without pre-defining the number of edges)
     node_count (int): The total number of nodes in the graph.
     comm_count (int): The number of communities in the graph.

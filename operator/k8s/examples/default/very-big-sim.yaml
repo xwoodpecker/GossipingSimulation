@@ -5,6 +5,6 @@ metadata:
 spec:
   graphSelector:
     matchLabels:
-      app: barab-n100-e1
+      app: barab-n500-e1
   algorithm: default
   visualize: false

@@ -47,16 +47,12 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             edge = tuple(map(int, edge_str.strip().split()))
             adjacency_list.append(edge)
 
-    logger.info(f'The graph has the adjacency list: {adjacency_list}')
-
     # get and sort all the nodes in the adj list
     entries = [split_str for split_str in split_adj_list]
-    nodes = [entry[0] for entry in entries]
+    nodes = [int(entry.split()[0]) for entry in entries]
     nodes.sort()
 
-    logger.info(f'The graph has the nodes: {nodes}')
-
-    # create a dictionary containing the nodes as keys 
+    # create a dictionary containing the nodes as keys
     # and their respective neighbors as values
     neighbors = {}
     for node in nodes:
@@ -65,8 +61,9 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
     # Construct neighbors for each node
     for entry in entries:
         sub_entries = entry.split()
-        key = sub_entries[0]
+        key = int(sub_entries[0])
         for sub_entry in sub_entries[1:]:
+            sub_entry = int(sub_entry)
             neighbors[key].append(sub_entry)
             neighbors[sub_entry].append(key)
     neighbors = {key: sorted(values) for key, values in sorted(neighbors.items())}

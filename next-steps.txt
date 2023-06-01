@@ -16,17 +16,17 @@
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A
 -----------------------------------------------------------------------------------------------------------------------
-!!! - refactor runner visualization similar to generator visualization
-    (maybe put plot in sharedclass)
-    use node mean value for community nodes when doing compact visualization
--> DONE (TEST! -> change 100 to smaller number and verify locally)
-- select node value "own" not needed (default behavior) when randomInitialization is set to false and no node list
-    is provided
+- refactor runner visualization similar to generator visualization
+-> DONE (TEST! -> change 100 to smaller number and verify locally) 
+- select node value "own" not needed  when randomInitialization is set to false and no node list provided
 -> DONE (TEST!)
+- refactor dockerfiles (help)
+- why modularity string?
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
 - maybe use log scale probability values for comm prob alg
+- add timestamp to result files (?)
 - use logger logic everywhere (?)
 - refactor classes / subclasses (move to separated files) (?)
 - run highlighting in runner/service (separation line or sth idk)
