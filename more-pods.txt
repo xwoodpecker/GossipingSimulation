@@ -1,0 +1,3 @@
+minikube start --extra-config=kubelet.max-pods=1000
+
+https://gist.github.com/grahamwhaley/4315f34a8f1da0932d59ce8de8f902ef

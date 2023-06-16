@@ -1,5 +1,6 @@
 import os
 import io
+import asyncio
 import imageio
 from PIL import Image, ImageDraw, ImageFont
 import grpc
@@ -201,6 +202,11 @@ class NodeValueHistory:
             str: The string representation of the node value history data.
         """
         return json.dumps(self.history, indent=2)
+
+
+async def stop_application_async(stub):
+    return await stub.StopApplication(gossip_pb2.StopApplicationRequest())
+
 
 class GossipRunner:
     """
@@ -552,6 +558,7 @@ class GossipRunner:
         """
         round_num = 1
         while True:
+            # todo: check if async calls work here
             print(f"Starting round {round_num} of gossiping...")
             for node in self.stub_dict:
                 print(f"Invoking Gossiping for node {node}.")
@@ -576,14 +583,24 @@ class GossipRunner:
         print(f"The full value history for this run: {self.node_value_history}")
         self.num_rounds = round_num
 
-    def stop_node_applications(self):
+    async def stop_node_applications(self):
         """
-        Stop all node applications over GRPC.
+        Stop all node applications over gRPC asynchronously.
         """
         print(f"Stopping node applications...")
-        for node in self.stub_dict: 
-            response = self.stub_dict[node].StopApplication(gossip_pb2.StopApplicationRequest())
-            print(f"Sent stop application request to node {node}")
+        tasks = []
+        for node in self.stub_dict:
+            task = stop_application_async(self.stub_dict[node])
+            tasks.append(task)
+
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for node, response in zip(self.stub_dict, responses):
+            if isinstance(response, Exception):
+                print(f"Error stopping application on node {node}: {response}")
+            else:
+                print(f"Successfully stopped application on node {node}")
+
 
 def create_graph(adj_list):
     """
@@ -650,7 +667,19 @@ if __name__ == '__main__':
     graph = create_graph(adj_list)
     # get and sort the network nodes for communication
     nodes = os.environ.get(ENVIRONMENT_NODES).rstrip(',').split(",")
-    nodes.sort()
+
+    def natural_sort_key(full_name):
+        # Extract the numeric part of the name using regular expressions
+        match = re.findall(r'\d+', full_name)
+        if match:
+            # Convert the last numeric part to an actual number for sorting
+            return int(match[-1])
+        else:
+            # If the name does not match the expected pattern, treat it as a high value
+            return float('inf')
+
+    # nodes = sorted(nodes, key=natural_sort_key)
+
     print(f"Received network nodes: {nodes}")
     # env for visualization settings
     visualize_str = os.environ.get(ENVIRONMENT_VISUALIZE)
@@ -683,6 +712,6 @@ if __name__ == '__main__':
         runner.store_average_results()
 
     # stop all nodes over grpc
-    runner.stop_node_applications()
+    asyncio.run(runner.stop_node_applications())
     print("Stopping application.")
     sys.exit(0)

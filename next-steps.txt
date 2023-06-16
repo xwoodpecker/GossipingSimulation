@@ -7,32 +7,76 @@
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A:
 -----------------------------------------------------------------------------------------------------------------------
-- start layout
-- write introduction
-- write background knowledge
-- write analysis + conception
+- testplanung
+- ablauf testreihen:
+    -> community gossip y/n simples binäres verfahren erprobren für versch graphtypen
+    -> verfahren entwickeln und optimieren für ausgewählte graphen
+- planung der testreihen an esch für feedback
+- {
+    + REFACTOR BARABASI / SCALE  FREE -> SAME BUT FOCUS ON DIFF. ALG.
+    + ADD explanation why scale free graphs are the main focus
+    +  maybe add/replace different graph types (?) -> argument why random graphs are not useful
+    + how to generate with fixed modularity (?)
+  }
+- barabasi albert -> "kantengrad" powerlaw misunderstanding
+-> differentiation edge degree (3/13)
+- modularity defintion (Wtf?)
+ https://en.wikipedia.org/wiki/Modularity_(networks)
+ https://www.pnas.org/doi/full/10.1073/pnas.0601602103
+ -> instead use: https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.quality.modularity.html
 -----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------BUGFIXING AND REFACTORING:--------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A
 -----------------------------------------------------------------------------------------------------------------------
+~Testing~
 - refactor runner visualization similar to generator visualization
 -> DONE (TEST! -> change 100 to smaller number and verify locally) 
 - select node value "own" not needed  when randomInitialization is set to false and no node list provided
 -> DONE (TEST!)
+- test if removal of sort() lead to correct gossip execution order for node pods
+- test if async stop applications works and is faster
+-> refactor (if working) async gossip invocation (!! use different active and passive TCP PORTS)
+
+~Refactor~
 - refactor dockerfiles (help)
 - why modularity string?
+
+- maybe add/replace different graph types (?) evaluate
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
 - maybe use log scale probability values for comm prob alg
 - add timestamp to result files (?)
 - use logger logic everywhere (?)
-- refactor classes / subclasses (move to separated files) (?)
-- run highlighting in runner/service (separation line or sth idk)
+
+
 -----------------------------------------------------------------------------------------------------------------------
 *Prio C
 -----------------------------------------------------------------------------------------------------------------------
 - maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
-- possibly refactor algorithm as standalone custom resource (???)
+- refactor visualization logic completely (its shit)
+- refactor classes / subclasses (move to separated files) (?)
+- run highlighting in runner/service (separation line or sth idk)
+- evaluate some real networks
 -----------------------------------------------------------------------------------------------------------------------
+
+Brainstorming:
+* graph generation extension
+method 1 : "100 out of 1000"
+generate 1000 graphs pick 100 with modularity closest to x
+method 2 : random graph generation instead of interpolation
+give lower and upper interval
+-> choose random value from interval for each generated graph
+method 3 : combine 1 + 2
+* advanced simulation resource
+matchLabels:
+ app: my-graph-with-properties
+-> other label
+"multiSimulation"
+runs x repeated simulations on y selected graphs
+for each different graph:
+deploy simulation resource
+wait til simulation is done (all pods completed)
+delete simulation resource
+extend graph generation to set simulation specific labels

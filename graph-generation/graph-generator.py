@@ -1,22 +1,28 @@
+import colorsys
 import io
 import os
+import random
 import sys
 
 import click
+import community
+import numpy
+import powerlaw
 import networkx as nx
 import numpy as np
 import pygraphviz as pgv
-import random
-import community
-import colorsys
+import yaml
 from PIL import Image
 
-from cfg import *
 import random_modular_generator_variable_modules as rmg
 import sequence_generator as sg
-import yaml
+from cfg import *
 
-# the code below can be used to generate really big images 
+# for powerlaw package
+numpy.seterr(divide='ignore', invalid='ignore')
+
+
+# the code below can be used to generate really big images
 # in case of a raising exception
 # from PIL.ImageFile import ImageFile
 # can be used to allow bigger images
@@ -25,7 +31,7 @@ import yaml
 # Image.MAX_IMAGE_PIXELS = None
 
 
-def make_fully_interconnected(graph):    
+def make_fully_interconnected(graph):
     """
     Make the graph fully interconnected by adding edges between components.
 
@@ -42,9 +48,9 @@ def make_fully_interconnected(graph):
     # Stop if the graph is already fully interconnected
     if num_components < 2:
         # No need to add edges if the graph is already fully interconnected
-        return graph  
+        return graph
 
-    # Randomly select two components to connect
+        # Randomly select two components to connect
     component1 = random.choice(components)
     component2 = random.choice(components)
 
@@ -102,6 +108,74 @@ def compute_modularity(graph, use_louvain=False):
 
     # Compute the modularity
     return nx.algorithms.community.modularity(graph, communities)
+
+
+def compute_average_edge_degree(graph):
+    """
+    Compute the average edge degree of a graph.
+
+    Parameters:
+        graph (networkx.Graph): The input graph.
+
+    Returns:
+        float: The average edge degree.
+
+    """
+    degrees = dict(graph.degree())
+    total_nodes = graph.number_of_nodes()
+
+    average_edge_degree = sum(degrees.values()) / total_nodes
+
+    return average_edge_degree
+
+
+def compute_power_law(graph):
+    """
+    Compute the power-law distribution parameters for the degree sequence of a graph.
+
+    Parameters:
+        graph (networkx.Graph): The input graph.
+
+    Returns:
+        float: The estimated power-law exponent.
+        float: The lower bound of the power-law region.
+
+    """
+    degrees = [graph.degree(node) for node in graph.nodes()]
+    fit = powerlaw.Fit(degrees)
+    alpha = fit.power_law.alpha
+    xmin = fit.power_law.xmin
+    return alpha, xmin
+
+
+def compute_average_path_length(graph):
+    """
+    Compute the average path length of a graph.
+
+    Parameters:
+        graph (networkx.Graph): The input graph.
+
+    Returns:
+        float: The average path length.
+
+    """
+    average_path_length = nx.average_shortest_path_length(graph)
+    return average_path_length
+
+
+def compute_cluster_coefficient(graph):
+    """
+    Compute the cluster coefficient of a graph.
+
+    Parameters:
+        graph (networkx.Graph): The input graph.
+
+    Returns:
+        float: The cluster coefficient.
+
+    """
+    cluster_coefficient = nx.average_clustering(graph)
+    return cluster_coefficient
 
 
 def generate_colors(num_colors):
@@ -303,7 +377,7 @@ def get_graph_properties_simple_graph(node_count, comm_count, p_intra, p_inter, 
     }
 
 
-def get_end_params_simple_graph():#
+def get_end_params_simple_graph():  #
     """
     Prompt the user to enter the end parameters for generating a simple graph.
 
@@ -517,14 +591,35 @@ def get_graph_properties_scale_free_graph(node_count, alpha, beta, gamma):
     }
 
 
-def prompt_edge_degree():
+def prompt_new_edges():
     """
-    Prompt the user to enter the edge degree in the graph.
+    Prompt the user to enter the number of new edges to add for each node in the graph.
 
     Returns:
-        int: The entered edge degree.
+        float: The entered number of new edges
     """
-    return click.prompt('Enter the edge degree in the graph', type=int, default=1)
+    return click.prompt('Enter the number of edges to attach from each newly added node', type=float, default=2.0)
+
+
+def prompt_new_edges_as_int():
+    """
+    Prompt the user to enter the number of new edges to add for each node in the graph.
+
+    Returns:
+        int: The entered number of new edges
+    """
+    return click.prompt('Enter the number of edges to attach from each newly added node', type=int, default=2)
+
+
+def prompt_triangle_probability():
+    """
+    Prompt the user to enter the probability of adding a triangle after adding a random edge.
+
+    Returns:
+        float: The probability of adding a triangle after adding a random edge
+    """
+    return click.prompt('Enter the probability of adding a triangle after adding a random edge', type=float,
+                        default=0.5)
 
 
 def get_params_barabasi_albert_graph():
@@ -536,24 +631,57 @@ def get_params_barabasi_albert_graph():
     """
 
     node_count = prompt_node_count()
-    edge_degree = prompt_edge_degree()
-    return node_count, edge_degree
+    new_edges = prompt_new_edges()
+    return node_count, new_edges
 
 
-def get_graph_properties_barabasi_albert_graph(node_count, edge_degree):
+def get_params_holme_kim_graph():
+    """
+    Prompt the user to enter parameters for generating a Holme-Kim graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count and edge degree.
+    """
+
+    node_count = prompt_node_count()
+    new_edges = prompt_new_edges_as_int()
+    triangle_probability = prompt_triangle_probability()
+    return node_count, new_edges, triangle_probability
+
+
+def get_graph_properties_barabasi_albert_graph(node_count, new_edges):
     """
     Get the graph properties based on the provided parameters for generating a Barabasi-Albert graph.
 
     Args:
         node_count (int): The total number of nodes in the graph.
-        edge_degree (int): The edge degree in the graph.
+        new_edges (float): The number of new edges for each node in the graph.
 
     Returns:
         dict: A dictionary containing the graph properties.
     """
     return {
         'nodeCount': node_count,
-        'edgeDegree': edge_degree
+        'newEdges': new_edges
+    }
+
+
+def get_graph_properties_holme_kim_graph(node_count, new_edges, triangle_probability):
+    """
+    Get the graph properties based on the provided parameters for generating a Holme-Kim graph.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        new_edges (int): The number of new edges for each node in the graph.
+        triangle_probability (float): Probability of adding a triangle after adding a random edge
+
+    Returns:
+        dict: A dictionary containing the graph properties.
+    """
+    return {
+        'nodeCount': node_count,
+        'newEdges': new_edges,
+        'triangleProbability': triangle_probability
     }
 
 
@@ -572,7 +700,8 @@ def get_get_params_func(graph_type):
         GRAPH_TYPE_SIMPLE_SHORT: get_params_simple_graph,
         GRAPH_TYPE_COMPLEX_SHORT: get_params_complex_graph,
         GRAPH_TYPE_SCALE_FREE_SHORT: get_params_scale_free_graph,
-        GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_params_barabasi_albert_graph
+        GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_params_barabasi_albert_graph,
+        GRAPH_TYPE_HOLME_KIM_SHORT: get_params_holme_kim_graph,
     }
     func = get_params_funcs.get(graph_type)
     return func
@@ -592,7 +721,8 @@ def get_get_graph_properties_func(graph_type):
         GRAPH_TYPE_SIMPLE_SHORT: get_graph_properties_simple_graph,
         GRAPH_TYPE_COMPLEX_SHORT: get_graph_properties_complex_graph,
         GRAPH_TYPE_SCALE_FREE_SHORT: get_graph_properties_scale_free_graph,
-        GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_graph_properties_barabasi_albert_graph
+        GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_graph_properties_barabasi_albert_graph,
+        GRAPH_TYPE_HOLME_KIM_SHORT: get_graph_properties_holme_kim_graph,
     }
     func = get_graph_properties_funcs.get(graph_type)
     return func
@@ -612,7 +742,8 @@ def get_get_end_params_func(graph_type):
         GRAPH_TYPE_SIMPLE_SHORT: get_end_params_simple_graph,
         GRAPH_TYPE_COMPLEX_SHORT: get_end_params_complex_graph,
         GRAPH_TYPE_SCALE_FREE_SHORT: get_params_scale_free_graph,
-        GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_params_barabasi_albert_graph
+        GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_params_barabasi_albert_graph,
+        GRAPH_TYPE_HOLME_KIM_SHORT: get_params_holme_kim_graph,
     }
     func = get_end_params_funcs.get(graph_type)
     return func
@@ -790,6 +921,7 @@ def generate_scale_free_graph(node_count, alpha, beta, gamma):
       """
     # Generate a scale-free graph with the specified number of nodes and parameters.
     graph = nx.scale_free_graph(node_count, alpha=alpha, beta=beta, gamma=gamma)
+    graph = nx.DiGraph(graph)
     graph.remove_edges_from(nx.selfloop_edges(graph))
     graph_undirected = nx.to_undirected(graph)
     fully_interconnected_graph = make_fully_interconnected(graph_undirected)
@@ -881,59 +1013,146 @@ def generate_complex_graph(node_count, degree, comm_count, modularity, degree_di
         sys.exit(0)
 
 
-def get_barabasi_albert_graph_name(node_count, edge_degree):
+def get_barabasi_albert_graph_name(node_count, new_edges):
     """
     Generate a name for a Barabasi-Albert graph based on the provided parameters.
 
     Args:
         node_count (int): The total number of nodes in the graph.
-        edge_degree (int): The degree of each new node added during the graph construction.
+        new_edges (float): The degree of each new node added during the graph construction.
 
     Returns:
         str: The generated graph name.
     """
-    return f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}-n{node_count}-e{edge_degree}'
+    return f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}-n{node_count}-e{new_edges}'
 
 
-def generate_barabasi_albert_graph(node_count, edge_degree):
+def get_holme_kim_graph_name(node_count, new_edges, triangle_probability):
+    """
+    Generate a name for a Barabasi-Albert graph based on the provided parameters.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        new_edges (int): The degree of each new node added during the graph construction.
+        triangle_probability (float):  Probability of adding a triangle after adding a random edge.
+
+    Returns:
+        str: The generated graph name.
+    """
+    return f'{GRAPH_TYPE_HOLME_KIM_SHORT}-n{node_count}-e{new_edges}-t{triangle_probability}'
+
+
+def generate_simple_barabasi_albert_graph(node_count, new_edges):
     """
        Generates a Barabasi-Albert graph with the specified number of nodes and minimum degree.
 
        Args:
            node_count (int): The number of nodes in the graph.
-           edge_degree (int): The number of edges to attach from a new node to existing nodes.
+           new_edges (float): The number of edges to attach from a new node to existing nodes.
 
        Returns:
-           A Barabasi-Albert graph of `node_count` nodes and `edge_degree` node attachments.
+           A Barabasi-Albert graph of `node_count` nodes and `new_edges` node attachments.
    """
     # Generate a barabasi albert graph with the specified number of nodes and exponent.
-    graph = nx.barabasi_albert_graph(node_count, edge_degree)
+    graph = nx.barabasi_albert_graph(node_count, new_edges)
+    return graph
+
+
+def generate_barabasi_albert_graph(node_count, new_edges):
+    """
+       Generates a Barabasi-Albert graph with the specified number of nodes and minimum degree.
+       Uses the dual barabasi albert generation method to support floating point edge degrees.
+
+       Args:
+           node_count (int): The number of nodes in the graph.
+           new_edges (float): The number of edges to attach from a new node to existing nodes.
+
+       Returns:
+           A Barabasi-Albert graph of `node_count` nodes and `new_edges` node attachments.
+   """
+
+    m1 = int(new_edges)  # Assign the integer part of edge_degree to m1
+    m2 = m1 + 1  # Assign m1 + 1 to m2
+    p = 1 - (new_edges - int(new_edges))
+
+    graph = nx.dual_barabasi_albert_graph(node_count, m1, m2, p)
+    return graph
+
+
+def generate_holme_kim_graph(node_count, new_edges, triangle_probability):
+    """
+       Generates a Holme-Kim graph with the specified number of nodes, number of new edges and triangle probability.
+       The Holme and Kim algorithm for growing graphs
+       with powerlaw degree distribution and approximate average clustering is used.
+
+       Args:
+           node_count (int): The number of nodes in the graph.
+           new_edges (int): The number of edges to attach from a new node to existing nodes.
+           triangle_probability (float):  Probability of adding a triangle after adding a random edge.
+
+       Returns:
+           A Holme and Kim Powerlaw Cluster Graph.
+   """
+    graph = nx.powerlaw_cluster_graph(node_count, new_edges, triangle_probability)
     return graph
 
 
 def get_creation_func(graph_type):
+    """
+       Returns the appropriate graph creation function based on the given graph type.
+
+       Args:
+           graph_type (str): The type of graph.
+
+       Returns:
+           func (function): The graph creation function corresponding to the graph type.
+    """
     create_graph_funcs = {
         GRAPH_TYPE_SIMPLE_SHORT: generate_simple_graph,
         GRAPH_TYPE_COMPLEX_SHORT: generate_complex_graph,
         GRAPH_TYPE_SCALE_FREE_SHORT: generate_scale_free_graph,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: generate_barabasi_albert_graph,
+        GRAPH_TYPE_HOLME_KIM_SHORT: generate_holme_kim_graph,
     }
     func = create_graph_funcs.get(graph_type)
     return func
 
 
 def get_graph_name(graph_type, graph_params):
+    """
+       Returns the name of the graph based on the graph type and its parameters.
+
+       Args:
+           graph_type (str): The type of graph.
+           graph_params (tuple): The parameters specific to the graph type.
+
+       Returns:
+           func (function): The function that generates the name of the graph based on its type and parameters.
+    """
     get_graph_name_funcs = {
         GRAPH_TYPE_SIMPLE_SHORT: get_simple_graph_name,
         GRAPH_TYPE_COMPLEX_SHORT: get_complex_graph_name,
         GRAPH_TYPE_SCALE_FREE_SHORT: get_scale_free_graph_name,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_barabasi_albert_graph_name,
+        GRAPH_TYPE_HOLME_KIM_SHORT: get_holme_kim_graph_name,
     }
     func = get_graph_name_funcs.get(graph_type)
     return func(*graph_params)
 
 
 def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, graph_properties, value_list=None):
+    """
+       Generates a YAML resource definition for a graph with its associated properties and values.
+
+       Args:
+           name (str): The name of the graph resource.
+           adjacency_list (list): The adjacency list representation of the graph.
+           graph_type (str): The type of graph.
+           modularity (float): The modularity of the graph.
+           graph_properties (list): The properties of the graph.
+           value_list (list, optional): The corresponding values for the properties (default is None).
+    """
+
     # Custom Dumper Class to correctly enquote strings
     class CustomDumper(yaml.Dumper):
         pass
@@ -951,7 +1170,7 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, g
 
     for key, value in graph_properties.items():
         if isinstance(value, float):
-            graph_properties[key] = round(value, 4)
+            value = round(value, 4)
         graph_properties[key] = QuotedString(value)
 
     resource_dict = {
@@ -974,6 +1193,13 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, g
 
 
 def save_graph_resource_yaml(content, name):
+    """
+        Saves the graph resource YAML content to a file.
+
+        Args:
+            content (str): The content of the YAML resource.
+            name (str): The name of the graph resource.
+    """
     directory = './generated_yamls/'
     os.makedirs(directory, exist_ok=True)  # Create the directory if it doesn't exist
     # Save the graph as an adjacency list
@@ -982,11 +1208,21 @@ def save_graph_resource_yaml(content, name):
 
 
 def get_graph_type_long(graph_type):
+    """
+        Returns the long version of the graph type based on the short version.
+
+        Args:
+            graph_type (str): The short version of the graph type.
+
+        Returns:
+            str: The long version of the graph type.
+    """
     long_graph_types = {
         GRAPH_TYPE_SIMPLE_SHORT: GRAPH_TYPE_SIMPLE,
         GRAPH_TYPE_COMPLEX_SHORT: GRAPH_TYPE_COMPLEX,
         GRAPH_TYPE_SCALE_FREE_SHORT: GRAPH_TYPE_SCALE_FREE,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: GRAPH_TYPE_BARABASI_ALBERT,
+        GRAPH_TYPE_HOLME_KIM_SHORT: GRAPH_TYPE_HOLME_KIM,
     }
     return long_graph_types.get(graph_type)
 
@@ -999,7 +1235,8 @@ CLICK_COUNT_PROMPT_TEXT = 'Enter the number of graphs that are to be generated\n
                           'with M as the number of different parameters\n' \
                           'and N as the number of graphs generated for each set of parameters'
 
-CLICK_GRAPH_TYPE_HELP_TEXT = f'The graph type (simple, complex, scale-free or barabasi-albert) for the created graph'
+CLICK_GRAPH_TYPE_HELP_TEXT = f'The graph type (simple, complex, scale-free, barabasi-albert or holme-kim) for the ' \
+                             f'created graph '
 
 CLICK_GRAPH_TYPE_PROMPT_TEXT = 'Choose graph type:\n' \
                                f'* [{GRAPH_TYPE_SIMPLE_SHORT}] : Simple modular graph creation ' \
@@ -1007,7 +1244,8 @@ CLICK_GRAPH_TYPE_PROMPT_TEXT = 'Choose graph type:\n' \
                                f'* [{GRAPH_TYPE_COMPLEX_SHORT}] : Complex modular graph creation ' \
                                'based on desired modularity\n' \
                                f'* [{GRAPH_TYPE_SCALE_FREE_SHORT}] : Scale-free graph creation\n' \
-                               f'* [{GRAPH_TYPE_BARABASI_ALBERT_SHORT}] : Barabási-Albert graph creation\n'
+                               f'* [{GRAPH_TYPE_BARABASI_ALBERT_SHORT}] : Barabási-Albert graph creation\n' \
+                               f'* [{GRAPH_TYPE_HOLME_KIM_SHORT}] : Holme-Kim powerlaw cluster graph creation\n'
 
 
 @click.command()
@@ -1017,10 +1255,19 @@ CLICK_GRAPH_TYPE_PROMPT_TEXT = 'Choose graph type:\n' \
               prompt=CLICK_COUNT_PROMPT_TEXT)
 @click.option('--graph-type',
               type=click.Choice([f'{GRAPH_TYPE_SIMPLE_SHORT}', f'{GRAPH_TYPE_COMPLEX_SHORT}',
-                                 f'{GRAPH_TYPE_SCALE_FREE_SHORT}', f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}']),
+                                 f'{GRAPH_TYPE_SCALE_FREE_SHORT}', f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}',
+                                 f'{GRAPH_TYPE_HOLME_KIM_SHORT}']),
               help=CLICK_GRAPH_TYPE_HELP_TEXT,
               prompt=CLICK_GRAPH_TYPE_PROMPT_TEXT)
 def generate_graphs(count, graph_type):
+    """
+        Generates graphs based on the given count and graph type.
+
+        Args:
+            count (str): The count of graphs to generate.
+            graph_type (str): The type of graph.
+
+    """
     sameParams = False
     run = True
     while run:
@@ -1056,17 +1303,31 @@ def generate_graphs(count, graph_type):
     get_graph_properties_func = get_get_graph_properties_func(graph_type)
     get_end_params_func = get_get_end_params_func(graph_type)
     create_graph_func = get_creation_func(graph_type)
+
+    graph_properties = {}
+    graphs = {}
+    name_counts = {}
+
+    def create_for_N(params):
+        for _ in range(0, N):
+            graph = create_graph_func(*params)
+            name = get_graph_name(graph_type, params)
+            if name not in name_counts:
+                # First occurrence of the name
+                name_counts[name] = 1
+            else:
+                # Duplicate name found
+                count = name_counts[name]
+                name_counts[name] += 1
+                name = f'{name}_{count}'
+            graph_properties[name] = get_graph_properties_func(*params)
+            graphs[name] = graph
+
     # get the graph parameters from user input
     graph_params = get_params_func()
-
-    graph_properties = []
-    graphs = []
     # create N graphs for the given params
     # add them and their properties to the arrays
-    for _ in range(0, N):
-        graph = create_graph_func(*graph_params)
-        graph_properties.append(get_graph_properties_func(*graph_params))
-        graphs.append((get_graph_name(graph_type, graph_params), graph))
+    create_for_N(graph_params)
 
     # in case of MxN graph creation
     if sameParams is False:
@@ -1075,10 +1336,7 @@ def generate_graphs(count, graph_type):
             # ask each set of params one by one
             for _ in range(0, M - 1):
                 graph_params = get_params_func()
-                for _ in range(0, N):
-                    graph = create_graph_func(*graph_params)
-                    graph_properties.append(get_graph_properties_func(*graph_params))
-                    graphs.append((get_graph_name(graph_type, graph_params), graph))
+                create_for_N(graph_params)
         else:
             print('Specify end parameters of the last set of graphs, values in between will be interpolated.')
             # ask for the last set of params
@@ -1105,47 +1363,45 @@ def generate_graphs(count, graph_type):
             # create N graphs for each set of params
             for params in graph_params_list:
                 for _ in range(0, N):
-                    graph = create_graph_func(*params)
-                    graph_properties.append(get_graph_properties_func(*params))
-                    graphs.append((get_graph_name(graph_type, params), graph))
-
-    # all graphs are created
-    # rename duplicate graph names
-    renamed_graphs = []
-    name_counts = {}
-    for name, graph in graphs:
-        if name not in name_counts:
-            # First occurrence of the name
-            name_counts[name] = 1
-            renamed_graphs.append((name, graph))
-        else:
-            # Duplicate name found
-            count = name_counts[name]
-            new_name = f"{name}_{count + 1}"
-            renamed_graphs.append((new_name, graph))
-            name_counts[name] += 1
-    graphs = renamed_graphs
+                    create_for_N(params)
 
     # visualize in case the user wants to see the graphs
     visualize = click.confirm('Do you want to see the created graphs?', default=False)
 
     graph_modularity = {}
-    if visualize:
-        for name, graph in graphs:
-            # plot the graph and show it
-            # compute louvain communities
-            num_communities = apply_louvain(graph)
-            # compute actual modularity based on the louvain communities
-            computed_modularity = compute_modularity(graph, use_louvain=True)
-            print(f'The graph has a computed modularity of {computed_modularity}.')
-            graph_modularity[graph] = computed_modularity
+    for name, graph in graphs.items():
+        print(f'Computing metrics for graph {name}:')
+        # plot the graph and show it
+        # compute louvain communities
+        num_communities = apply_louvain(graph)
+        # compute actual modularity based on the louvain communities
+        computed_modularity = compute_modularity(graph, use_louvain=True)
+        print(f'The graph has a computed modularity of {computed_modularity}.')
+
+        computed_avg_degree = compute_average_edge_degree(graph)
+        print(f'The graph has a computed average degree of {computed_avg_degree}.')
+        # computed_power_law_exp, lower_bound = compute_power_law(graph)
+        # print(f'The graph has a computed power law of {computed_avg_degree} with lower bound {lower_bound}.')
+        computed_avg_path_length = compute_average_path_length(graph)
+        print(f'The graph has a computed avg path length of {computed_avg_path_length}.')
+        computed_clust_coefficient = compute_cluster_coefficient(graph)
+        print(f'The graph has a computed cluster coefficient of {computed_clust_coefficient}.')
+
+        graph_properties[name]['averageEdgeDegree'] = computed_avg_degree
+        # graph_properties[name]['estimatedPowerLawExponent'] = computed_power_law_exp
+        # graph_properties[name]['lowerBoundPowerLawRegion'] = lower_bound
+        graph_properties[name]['averagePathLength'] = computed_avg_path_length
+        graph_properties[name]['clusterCoefficient'] = computed_clust_coefficient
+        graph_modularity[name] = computed_modularity
+
+        if visualize:
             plot(graph, num_communities, use_louvain=True)
 
     choice = click.prompt('Do you want to save the graphs as adjacency lists or create a k8s graph resource?',
                           type=click.Choice(['adj', 'k8s']), default='k8s')
     if choice == 'adj':
         prefix = click.prompt('Enter the file name prefix', type=str, default="")
-        for name, graph in graphs:
+        for name, graph in graphs.items():
             save_graph_as_adj_list(graph, f'{prefix}_{name}')
     elif choice == 'k8s':
         # generate k8s graph resource .yaml file
@@ -1155,7 +1411,7 @@ def generate_graphs(count, graph_type):
         value_list = None
         custom = click.confirm('Do you want to set custom node values?', default=False)
         if custom:
-            node_count = max(graph[1].number_of_nodes() for graph in graphs)
+            node_count = max(graph[1].number_of_nodes() for graph in graphs.values())
             while True:
                 value_list_input = click.prompt(f"Enter {node_count} numbers (separated by commas)")
                 value_list = [int(num.strip()) for num in value_list_input.split(",")]
@@ -1177,7 +1433,7 @@ def generate_graphs(count, graph_type):
             own_prefix = click.prompt('Enter the name prefix that will be used as a replacement', type=str)
 
         i = 0
-        for name, graph in graphs:
+        for name, graph in graphs.items():
             # create name string
             if choice == 'add':
                 name_string = added_prefix + name
@@ -1196,14 +1452,9 @@ def generate_graphs(count, graph_type):
 
             # adj list string and graph properties
             adjacency_list_string = ','.join(nx.generate_adjlist(graph))
-            graph_props = graph_properties[i]
+            graph_props = graph_properties[name]
 
-            if not visualize:
-                apply_louvain(graph)
-                # compute actual modularity based on the louvain communities
-                modularity = compute_modularity(graph, use_louvain=True)
-            else:
-                modularity = graph_modularity[graph]
+            modularity = graph_modularity[name]
 
             # generate yaml string
             yaml_string = generate_graph_resource_yaml(name_string,

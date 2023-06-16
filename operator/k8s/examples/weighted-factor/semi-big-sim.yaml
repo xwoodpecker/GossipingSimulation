@@ -1,0 +1,12 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: my-simulation
+spec:
+  graphSelector:
+    matchLabels:
+      app: barab-n250-e1
+  algorithm: weighted_factor
+  visualize: false
+  randomInitialization: false
+  factor: 1.25

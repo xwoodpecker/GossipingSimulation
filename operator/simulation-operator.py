@@ -86,10 +86,11 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                 - community_node_dict (dict): A dictionary mapping community IDs to lists of node IDs.
         """
         # create a dictionary with node ids as keys and community ids as values
-        node_community_dict = {node: community_id for node, community_id in partition.items()}
+        # this is effectively a non-shallow copy of partition
+        node_community_dict = {int(node): int(community_id) for node, community_id in partition.items()}
         # this dict contains the community ids as keys and the node ids as values
         community_node_dict = {}
-        for node, community_id in partition.items():
+        for node, community_id in node_community_dict.items():
             if community_id not in community_node_dict:
                 community_node_dict[community_id] = [node]
             else:
@@ -97,7 +98,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         logger.info(f'Node communities: {node_community_dict}')
         return node_community_dict, community_node_dict
 
-    # comminities are needed for weighted_factor and community probability assignment
+    # communities are needed for weighted_factor and community probability assignment
     if algorithm in NODE_COMMUNITIES_SET:
         graph = nx.parse_adjlist(split_adj_list)
         # apply louvain method on the graph
