@@ -1,3 +1,4 @@
+import concurrent
 import os
 import io
 import asyncio
@@ -7,7 +8,7 @@ import grpc
 import time
 import datetime
 import socket
-import  sys
+import sys
 import re
 import json
 import colorsys
@@ -21,10 +22,12 @@ import gossip_pb2
 import gossip_pb2_grpc
 from cfg import *
 
+
 class MinioAccess:
     """
     Represents access parameters for Minio.
     """
+
     def __init__(self, endpoint, user, password):
         """
         Initialize Minio access parameters.
@@ -38,10 +41,12 @@ class MinioAccess:
         self.user = user
         self.password = password
 
+
 class AlgorithmData:
     """
     Represents data related to an algorithm.
     """
+
     def __init__(self, name, simulation_properties):
         """
         Initialize algorithm data.
@@ -54,10 +59,12 @@ class AlgorithmData:
         self.name = name
         self.properties = simulation_properties
 
+
 class GraphData:
     """
     Represents data related to a graph.
     """
+
     def __init__(self, adj_list, nodes, graph, visualize, graph_properties, node_communities=None):
         """
         Initialize graph data.
@@ -95,6 +102,7 @@ class Result:
     """
     Represents the result of a simulation.
     """
+
     def __init__(self, num_rounds, algorithm_data, adj_list, graph_metadata=None):
         """
         Initialize the result of a simulation.
@@ -119,8 +127,7 @@ class Result:
             self.dict['graph_metadata'] = self.graph_metadata
         if self.simulation_properties is not None and self.simulation_properties:
             self.dict['algorithm_metadata'] = self.simulation_properties
-                
-    
+
     def to_buffered_reader(self):
         """
         Convert the result to a buffered reader.
@@ -149,16 +156,18 @@ class Result:
         """
         return json.dumps(self.dict, indent=2)
 
+
 class NodeValueHistory:
     """
     Represents the history of node values in a simulation.
     """
-    def __init__(self): 
+
+    def __init__(self):
         """
         Initialize the NodeValueHistory object with an empty history.
         """
         self.history = []
-    
+
     def add(self, round_num, node, value):
         """
         Add a node value to the history.
@@ -174,7 +183,7 @@ class NodeValueHistory:
             self.history.append(round_data)
         else:
             round_data['nodes'][node] = value
-    
+
     def to_buffered_reader(self):
         """
         Convert the node value history to a buffered reader.
@@ -183,7 +192,7 @@ class NodeValueHistory:
             io.BufferedReader: A buffered reader containing the node value history data.
         """
         return io.BufferedReader(io.BytesIO(str(self).encode()))
-    
+
     def file_size(self):
         """
         Get the file size of the node value history data.
@@ -193,7 +202,7 @@ class NodeValueHistory:
         """
         json_data_bytes = str(self).encode()
         return len(json_data_bytes)
-    
+
     def __str__(self):
         """
         Convert the node value history data to a string representation.
@@ -204,15 +213,12 @@ class NodeValueHistory:
         return json.dumps(self.history, indent=2)
 
 
-async def stop_application_async(stub):
-    return await stub.StopApplication(gossip_pb2.StopApplicationRequest())
-
-
 class GossipRunner:
     """
     Represents the runner for the gossip simulation.
     Makes the hosts gossip round by round and stores the simulation results.
     """
+
     def __init__(self, simulation_name, algorithm_data, repeated, graph_data, minio_access):
         """
         Initialize the GossipRunner.
@@ -237,7 +243,8 @@ class GossipRunner:
         self.nodes = graph_data.nodes
         self.graph = graph_data.graph
         # set the grpc gossip stubs that are used for runner to node communication
-        self.stubs = [gossip_pb2_grpc.GossipStub(grpc.insecure_channel(f"{node}:{GRPC_SERVICE_PORT}")) for node in nodes]
+        self.stubs = [gossip_pb2_grpc.GossipStub(grpc.insecure_channel(f"{node}:{GRPC_SERVICE_PORT}")) for node in
+                      nodes]
         self.stub_dict = {node: stub for node, stub in zip(nodes, self.stubs)}
         self.buffer_dict = {}
         self.minio_access = minio_access
@@ -267,6 +274,7 @@ class GossipRunner:
         Args:
             num_comm (int): The number of communities in the graph (default: 0).
         """
+
         def generate_colors(num_colors):
             """
             Generate a list of colors for visualization.
@@ -289,7 +297,7 @@ class GossipRunner:
                 colors.append(rgb)
             print(f'Generated {num_colors} colors for visualization')
             return colors
-        
+
         if num_comm > 0:
             colors = generate_colors(num_comm)
             print(f'Community colors generated')
@@ -299,7 +307,7 @@ class GossipRunner:
 
         if self.graph.number_of_nodes() <= MAXIMUM_NODE_NUMBER_NORMAL_PLOT:
             # Assign a color to each node based on its community
-            idx = 0    
+            idx = 0
             community_colors = {}
             for node, data in self.graph.nodes(data=True):
                 if num_comm > 0:
@@ -313,12 +321,12 @@ class GossipRunner:
                 g.add_node(node, style='filled', fillcolor=node_color)
                 print(f'Added node {node} with color {node_color} to pgv graph')
             print(f'All nodes set for pgv graph')
-            
+
             # Add edges to the graph
             for edge in self.graph.edges():
                 g.add_edge(edge[0], edge[1])
             print(f'All edges added for pgv graph')
-        else:         
+        else:
             if num_comm > 0:
                 # Add communities as nodes to the new graph
                 for i in range(0, num_comm):
@@ -337,7 +345,7 @@ class GossipRunner:
                 return
         # set the gpv graph to the local var
         self.pgv_graph = g
-            
+
     def plot_graph(self, round_num, num_comm=0):
         """
         Plot the graph to visualize the state of the nodes.
@@ -362,7 +370,7 @@ class GossipRunner:
                     for node in community_nodes:
                         node_value = self.graph.nodes[node]['value']
                         values.append(node_value)
-                    avg_value = sum(values ) / len(values)
+                    avg_value = sum(values) / len(values)
                     label = f"<<b>{round(avg_value, 2)}</b>>"
                     self.pgv_graph.get_node(i).attr['label'] = label
             else:
@@ -397,11 +405,11 @@ class GossipRunner:
             Minio: The Minio client instance.
         """
         client = Minio(
-                self.minio_access.endpoint,
-                access_key=self.minio_access.user,
-                secret_key=self.minio_access.password,
-                secure=False
-            )
+            self.minio_access.endpoint,
+            access_key=self.minio_access.user,
+            secret_key=self.minio_access.password,
+            secure=False
+        )
 
         # Make 'simulations' bucket if not exist.
         found = client.bucket_exists(MINIO_BUCKET_NAME)
@@ -420,14 +428,13 @@ class GossipRunner:
             client = self.init_minio()
 
             current_date = datetime.datetime.now().strftime(MINIO_TIME_FORMAT_STRING)
-            
-            
+
             if self.repeated:
                 if self.run_number == 1:
-                    self.simulation_path = object_path=f'{simulation_name}-{current_date}'
+                    self.simulation_path = object_path = f'{simulation_name}-{current_date}'
                 object_path = self.simulation_path + f'/run-{self.run_number}'
             else:
-                object_path=f'{simulation_name}-{current_date}'
+                object_path = f'{simulation_name}-{current_date}'
 
             images = {}
             max_width = 0
@@ -449,7 +456,7 @@ class GossipRunner:
                 # find  the largest image
                 max_width = max(max_width, img.width)
                 max_height = max(max_height, img.height)
-            
+
             gif_images = []
             for round_num, image in images.items():
                 title = f"Round#{round_num}"
@@ -469,12 +476,12 @@ class GossipRunner:
             if len(gif_images) > 0:
                 with io.BytesIO() as output:
                     # show one frame for 4 seconds
-                    imageio.mimsave(output, gif_images, format='GIF', fps=1/4)
+                    imageio.mimsave(output, gif_images, format='GIF', fps=1 / 4)
 
                     # Create another BytesIO instance and write the gif_bytes to it
                     gif_buffer = io.BytesIO(output.getvalue())
-                
-                object_name=f'{simulation_name}_visualized'
+
+                object_name = f'{simulation_name}_visualized'
                 file_size = len(gif_buffer.getbuffer())
                 gif_buffer.seek(0)  # Rewind the buffer to the beginning
                 client.put_object(
@@ -489,7 +496,7 @@ class GossipRunner:
             result = Result(self.num_rounds, self.algorithm_data, self.graph_data.adj_list, self.graph_data.properties)
             if self.repeated:
                 self.results.append(result)
-            object_name=f'{simulation_name}_summary'
+            object_name = f'{simulation_name}_summary'
             client.put_object(
                 MINIO_BUCKET_NAME,
                 f'{object_path}/{object_name}.json',
@@ -499,8 +506,8 @@ class GossipRunner:
                 # metadata={"": ""},
             )
             print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
-            
-            object_name=f'{simulation_name}_node_value_history'
+
+            object_name = f'{simulation_name}_node_value_history'
             client.put_object(
                 MINIO_BUCKET_NAME,
                 f'{object_path}/{object_name}.json',
@@ -513,7 +520,7 @@ class GossipRunner:
 
         except S3Error as exc:
             print("minio error occurred: ", exc)
-        
+
     def store_average_results(self):
         """
         Store the averaged simulation results in Minio.
@@ -521,11 +528,12 @@ class GossipRunner:
         try:
             client = self.init_minio()
 
-            object_path=self.simulation_path
+            object_path = self.simulation_path
 
             avg_num_rounds = avg_num_rounds = sum(result.num_rounds for result in self.results) / len(self.results)
-            averaged_result = Result(avg_num_rounds, self.algorithm_data, self.graph_data.adj_list, self.graph_data.properties)
-            object_name=f'{simulation_name}_averaged_result'
+            averaged_result = Result(avg_num_rounds, self.algorithm_data, self.graph_data.adj_list,
+                                     self.graph_data.properties)
+            object_name = f'{simulation_name}_averaged_result'
             client.put_object(
                 MINIO_BUCKET_NAME,
                 f'{object_path}/{object_name}.json',
@@ -537,18 +545,39 @@ class GossipRunner:
         except S3Error as exc:
             print("minio error occurred: ", exc)
 
+    def grpc_current_value(self, stub):
+        return stub.CurrentValue(gossip_pb2.CurrentValueRequest())
+
+    def grpc_gossip(self, stub):
+        return stub.Gossip(gossip_pb2.GossipRequest())
+
+    def grpc_stop_application(self, stub):
+        return stub.StopApplication(gossip_pb2.StopApplicationRequest())
 
     def init_node_value_history(self):
         """
         Initialize the node value history and update the graph with initial values.
         """
-
         self.node_value_history = NodeValueHistory()
-        for node in self.stub_dict: 
-            response = self.stub_dict[node].CurrentValue(gossip_pb2.CurrentValueRequest())
-            value = int(response.value)
-            self.node_value_history.add(0, self.graph_data.node_dict[node], value)
-            self.update_graph_node(node, value)
+
+        # Create a ThreadPoolExecutor with the desired number of threads
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
+        # Submit the gRPC calls to the executor
+        futures = [executor.submit(self.grpc_current_value, self.stub_dict[node]) for node in self.stub_dict]
+        # Wait for all the calls to finish
+        concurrent.futures.wait(futures)
+        value_responses = [future.result() for future in futures]
+        print('Debug: all async current value tasks completed')
+
+        for i, node in enumerate(self.stub_dict):
+            response = value_responses[i]
+            if isinstance(response, Exception):
+                print(f"Error receiving current value on node {node}: {response}")
+            else:
+                value = int(response.value)
+                print(f"Node {node} has initial value {value}.")
+                self.node_value_history.add(0, self.graph_data.node_dict[node], value)
+                self.update_graph_node(node, value)
         if self.graph_data.visualize:
             self.plot_graph(0, self.graph_data.num_communities)
 
@@ -558,44 +587,58 @@ class GossipRunner:
         """
         round_num = 1
         while True:
-            # todo: check if async calls work here
             print(f"Starting round {round_num} of gossiping...")
-            for node in self.stub_dict:
-                print(f"Invoking Gossiping for node {node}.")
-                response = self.stub_dict[node].Gossip(gossip_pb2.GossipRequest())
-                #time.sleep(1)
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
+            # Submit the gRPC calls to the executor
+            futures = [executor.submit(self.grpc_gossip, self.stub_dict[node]) for node in self.stub_dict]
+            # Wait for all the calls to finish
+            concurrent.futures.wait(futures)
+            print('Debug: all async gossip tasks completed')
             print(f"Round {round_num} of gossiping ended. Printing results.")
+
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
+            # Submit the gRPC calls to the executor
+            futures = [executor.submit(self.grpc_current_value, self.stub_dict[node]) for node in self.stub_dict]
+            # Wait for all the calls to finish
+            concurrent.futures.wait(futures)
+            value_responses = [future.result() for future in futures]
+            print('Debug: all async current value tasks completed')
+
             values = []
-            for node in self.stub_dict:
-                response = self.stub_dict[node].CurrentValue(gossip_pb2.CurrentValueRequest())
-                value = int(response.value)
-                values.append(value)
-                print(f"Node {node} has value {value}.")
-                self.node_value_history.add(round_num, self.graph_data.node_dict[node], value)
-                self.update_graph_node(node, value)
+            for i, node in enumerate(self.stub_dict):
+                response = value_responses[i]
+                if isinstance(response, Exception):
+                    print(f"Error receiving current value on node {node}: {response}")
+                else:
+                    value = int(response.value)
+                    values.append(value)
+                    print(f"Node {node} has value {value}.")
+                    values.append(value)
+                    self.node_value_history.add(round_num, self.graph_data.node_dict[node], value)
+                    self.update_graph_node(node, value)
             if self.graph_data.visualize:
                 self.plot_graph(round_num, self.graph_data.num_communities)
             if all(value == values[0] for value in values):
                 print(f"All hosts have converged on value {values[0]}")
                 break
             round_num += 1
-            time.sleep(0.5)
         print(f"The full value history for this run: {self.node_value_history}")
         self.num_rounds = round_num
 
-    async def stop_node_applications(self):
+    def stop_node_applications(self):
         """
         Stop all node applications over gRPC asynchronously.
         """
         print(f"Stopping node applications...")
-        tasks = []
-        for node in self.stub_dict:
-            task = stop_application_async(self.stub_dict[node])
-            tasks.append(task)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
+        # Submit the gRPC calls to the executor
+        futures = [executor.submit(self.grpc_stop_application, self.stub_dict[node]) for node in self.stub_dict]
+        # Wait for all the calls to finish
+        concurrent.futures.wait(futures)
+        stop_app_responses = [future.result() for future in futures]
+        print('Debug: all async stop application tasks completed')
 
-        responses = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for node, response in zip(self.stub_dict, responses):
+        for node, response in zip(self.stub_dict, stop_app_responses):
             if isinstance(response, Exception):
                 print(f"Error stopping application on node {node}: {response}")
             else:
@@ -668,6 +711,7 @@ if __name__ == '__main__':
     # get and sort the network nodes for communication
     nodes = os.environ.get(ENVIRONMENT_NODES).rstrip(',').split(",")
 
+
     def natural_sort_key(full_name):
         # Extract the numeric part of the name using regular expressions
         match = re.findall(r'\d+', full_name)
@@ -677,6 +721,7 @@ if __name__ == '__main__':
         else:
             # If the name does not match the expected pattern, treat it as a high value
             return float('inf')
+
 
     # nodes = sorted(nodes, key=natural_sort_key)
 
@@ -702,7 +747,7 @@ if __name__ == '__main__':
 
     # repeat for additional repetitions
     for i in range(1, repetitions):
-        print(f'Repeated Run #{i+1} executing...')
+        print(f'Repeated Run #{i + 1} executing...')
         runner.init_next_run()
         runner.init_node_value_history()
         runner.run()
@@ -712,6 +757,6 @@ if __name__ == '__main__':
         runner.store_average_results()
 
     # stop all nodes over grpc
-    asyncio.run(runner.stop_node_applications())
+    runner.stop_node_applications()
     print("Stopping application.")
     sys.exit(0)

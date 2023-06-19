@@ -30,8 +30,6 @@
 *Prio A
 -----------------------------------------------------------------------------------------------------------------------
 ~Testing~
-- refactor runner visualization similar to generator visualization
--> DONE (TEST! -> change 100 to smaller number and verify locally) 
 - select node value "own" not needed  when randomInitialization is set to false and no node list provided
 -> DONE (TEST!)
 - test if removal of sort() lead to correct gossip execution order for node pods
@@ -40,7 +38,7 @@
 
 ~Refactor~
 - refactor dockerfiles (help)
-- why modularity string?
+- why modularity string? (graph resource)
 
 - maybe add/replace different graph types (?) evaluate
 -----------------------------------------------------------------------------------------------------------------------

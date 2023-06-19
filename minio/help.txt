@@ -17,3 +17,6 @@ nodePort: 32651
 minikube service minio --url
 http://192.168.178.58:32650
 http://192.168.178.58:32651
+
+Installation with custom pv/pvc:
+helm install minio-custom --set persistence.existingClaim=minio-pvc --set volumePermissions.enabled=true oci://registry-1.docker.io/bitnamicharts/minio

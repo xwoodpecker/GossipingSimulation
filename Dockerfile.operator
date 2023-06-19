@@ -1,6 +1,5 @@
 FROM python:3.8-slim-buster
 
-
 # install all requirements 
 RUN pip install -U  --upgrade pip
 COPY operator/requirements.txt /app/requirements.txt

@@ -386,17 +386,19 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         Returns:
             None
         """
+        thread_id = threading.get_ident()
         self.participations += 1
         peer_name, peer_value = data.decode('utf-8').split(':')
-        print(f"Received peer value: {peer_value} from {peer_name}")
-        print(f"Current value: {self.value}")
+        # print(f"Received peer value: {peer_value} from {peer_name}")
+        print(f"DEBUG {thread_id} - Received peer value: {peer_value} from {peer_name}")
+        print(f"DEBUG {thread_id} - Current value: {self.value}")
         old_value = self.value
         # set the minimum as the new value
         self.value = min(self.value, int(peer_value))
         if old_value == self.value:
-            print(f"Value was not changed")
+            print(f"DEBUG {thread_id} - Value was not changed")
         else:
-            print(f"New value after gossiping: {self.value}")
+            print(f"DEBUG {thread_id} - New value after gossiping: {self.value}")
             if isinstance(self.algorithm, ComplexMemory):
                 self.algorithm.forget()
         # log the participation as a value entry
@@ -510,6 +512,26 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         self._stop_event.set()
         return gossip_pb2.StopApplicationResponse()
 
+    def handle_connection(self, conn):
+        """
+        Handle an incoming gossip connection.
+
+        Args:
+            conn (socket.socket): The socket connection.
+
+        Returns:
+            None
+        """
+        try:
+            # Process incoming data
+            data = conn.recv(TCP_BUFSIZE)
+            self.process_gossip_data(data)
+            conn.sendall(bytes(f'{self.name}:{self.value}', 'utf-8'))
+            thread_id = threading.get_ident()
+            print(f"DEBUG {thread_id} - Responded with value of {self.value} over TCP socket.")
+        finally:
+            conn.close()
+
     def listen_for_connections(self):
         """
         Start listening for incoming gossip connections.
@@ -526,17 +548,12 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
                     server_socket.settimeout(3)
                     try:
                         conn, addr = server_socket.accept()
+                        print(f'Gossiping request accepted from {addr[0]}:{addr[1]}')
+                        # Handle the connection in a separate thread
+                        conn_thread = threading.Thread(target=self.handle_connection, args=(conn,))
+                        conn_thread.start()
                     except socket.timeout:
                         continue
-                    try:
-                        print(f'Gossiping request accepted from {addr[0]}:{addr[1]}')
-                        # Process incoming data
-                        data = conn.recv(TCP_BUFSIZE)
-                        self.process_gossip_data(data)
-                        conn.sendall(bytes(f'{self.name}:{self.value}', 'utf-8'))
-                        print(f"Responded with value of {self.value} over TCP socket.")
-                    finally:
-                        conn.close()
         except socket.error as e:
             print(f"Socket error occurred: {str(e)}")
 

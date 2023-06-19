@@ -1,13 +1,13 @@
-FROM python:3.9-alpine as base
+FROM python:3.9-slim-buster
 
-RUN apk add --update \
-    gcc \
-    g++ \
-    make \
-    musl-dev \
-    python3-dev \
-    libc6-compat \
-    && rm -rf /var/cache/apk/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        make \
+        musl-dev \
+        python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3 -m venv $VIRTUAL_ENV

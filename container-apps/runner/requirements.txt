@@ -1,5 +1,5 @@
-protobuf==4.22.1
-grpcio==1.51.3
+protobuf==4.23.3
+grpcio==1.54.2
 networkx==3.0
 minio==7.1.14
 pygraphviz==1.9
