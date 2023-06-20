@@ -1140,7 +1140,8 @@ def get_graph_name(graph_type, graph_params):
     return func(*graph_params)
 
 
-def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, graph_properties, value_list=None):
+def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, graph_properties,
+                                 series_label=None, value_list=None, ):
     """
        Generates a YAML resource definition for a graph with its associated properties and values.
 
@@ -1150,6 +1151,7 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, g
            graph_type (str): The type of graph.
            modularity (float): The modularity of the graph.
            graph_properties (list): The properties of the graph.
+           series_label (str, optional): The label for serial simulation (default is None).
            value_list (list, optional): The corresponding values for the properties (default is None).
     """
 
@@ -1177,15 +1179,21 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, g
         'apiVersion': 'gossip.io/v1',
         'kind': 'Graph',
         'metadata': {
-            'name': name
+            'name': name,
         },
         'spec': {
             'adjacencyList': QuotedString(adjacency_list),
             'graphType': QuotedString(graph_type),
-            'modularity': QuotedString(round(modularity, 4)),
+            'modularity': round(modularity, 4),
             'graphProperties': graph_properties
         }
     }
+
+    if series_label is not None:
+        resource_dict['metadata']['labels'] = {
+            'series': series_label
+        }
+
     if value_list is not None:
         resource_dict['spec']['valueList'] = f"'{value_list}'"
 
@@ -1432,6 +1440,10 @@ def generate_graphs(count, graph_type):
         if choice == 'own':
             own_prefix = click.prompt('Enter the name prefix that will be used as a replacement', type=str)
 
+        series_label = click.prompt('Enter series label (optional)', type=str, default="")
+        if not series_label:
+            series_label = None
+
         i = 0
         for name, graph in graphs.items():
             # create name string
@@ -1462,7 +1474,9 @@ def generate_graphs(count, graph_type):
                                                        graph_type_string,
                                                        modularity,
                                                        graph_props,
-                                                       value_list_string)
+                                                       series_label,
+                                                       value_list_string,
+                                                       )
             # save the graph resource as yaml file
             save_graph_resource_yaml(yaml_string, name_string)
             i += 1

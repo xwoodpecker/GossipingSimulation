@@ -1,0 +1,8 @@
+apiVersion: gossip.io/v1
+kind: Graph
+metadata:
+  name: my-graph-2
+  labels:
+    series: my-series
+spec:
+  adjacencyList: "1 2 3,2 3 4,3 4,4 5,5"

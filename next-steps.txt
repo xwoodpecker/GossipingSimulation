@@ -29,18 +29,10 @@
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A
 -----------------------------------------------------------------------------------------------------------------------
-~Testing~
-- select node value "own" not needed  when randomInitialization is set to false and no node list provided
--> DONE (TEST!)
-- test if removal of sort() lead to correct gossip execution order for node pods
-- test if async stop applications works and is faster
--> refactor (if working) async gossip invocation (!! use different active and passive TCP PORTS)
-
 ~Refactor~
-- refactor dockerfiles (help)
-- why modularity string? (graph resource)
-
-- maybe add/replace different graph types (?) evaluate
+- realize brainstorming idea(s)
+-> * advanced simulation resource
+extend graph generation to set simulation specific labels
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
@@ -67,14 +59,4 @@ method 2 : random graph generation instead of interpolation
 give lower and upper interval
 -> choose random value from interval for each generated graph
 method 3 : combine 1 + 2
-* advanced simulation resource
-matchLabels:
- app: my-graph-with-properties
--> other label
-"multiSimulation"
-runs x repeated simulations on y selected graphs
-for each different graph:
-deploy simulation resource
-wait til simulation is done (all pods completed)
-delete simulation resource
-extend graph generation to set simulation specific labels
+

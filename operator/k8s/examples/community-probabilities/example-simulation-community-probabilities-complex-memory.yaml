@@ -5,7 +5,7 @@ metadata:
 spec:
   graphSelector:
     matchLabels:
-      app: my-graph-with-properties
+      name: my-graph-with-properties
   algorithm: community_probabilities_complex_memory
   repetitions: 1
   visualize: true

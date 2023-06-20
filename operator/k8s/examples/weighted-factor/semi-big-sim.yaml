@@ -5,7 +5,7 @@ metadata:
 spec:
   graphSelector:
     matchLabels:
-      app: barab-n250-e1
+      name: barab-n250-e1
   algorithm: weighted_factor
   visualize: false
   randomInitialization: false

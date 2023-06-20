@@ -5,7 +5,7 @@ metadata:
 spec:
   graphSelector:
     matchLabels:
-      app: my-graph-with-properties
+      name: my-graph-with-properties
   algorithm: weighted_factor
   repetitions: 2
   visualize: true

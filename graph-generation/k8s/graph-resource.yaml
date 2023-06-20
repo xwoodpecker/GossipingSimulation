@@ -21,7 +21,7 @@ spec:
                   type: string
                   default: 'undefined'
                 modularity: 
-                  type: string # refactor
+                  type: number
                 valueList:
                   type: string
                 graphProperties:

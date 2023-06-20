@@ -8,4 +8,4 @@ spec:
     edgeDegree: "1"
     nodeCount: "100"
   graphType: "barabasi-albert"
-  modularity: "0.7454"
+  modularity: 0.7454

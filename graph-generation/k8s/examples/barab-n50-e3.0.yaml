@@ -11,4 +11,4 @@ spec:
     newEdges: "3.0"
     nodeCount: "50"
   graphType: "barabasi-albert"
-  modularity: "0.3082"
+  modularity: 0.3082
