@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------(NEW)DEVELOPMENT:-----------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
-
+- Evaluationsroutine
 -----------------------------------------------------------------------------------------------------------------------
 --------------------------------------------------DOCUMENTATION:-------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
@@ -30,33 +30,27 @@
 *Prio A
 -----------------------------------------------------------------------------------------------------------------------
 ~Refactor~
-- realize brainstorming idea(s)
--> * advanced simulation resource
-extend graph generation to set simulation specific labels
+- check rel.work -> add metrics (?)
+- move modularity to graphProperties as well
+- solve metrics resolution in graph_generator (todo)
+- refactor result saving:
+ * add csv for all simulations
+ * round-based -> useless
+ * how to series
+ * split graph <-> simulation logging and repeated logging (?)
+ * add timestamp to result files (?)
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
 - maybe use log scale probability values for comm prob alg
-- add timestamp to result files (?)
-- use logger logic everywhere (?)
-
-
+- logging:
+ * use logger logic everywhere (?)
+ * run highlighting in runner/service (separation line or sth idk)
 -----------------------------------------------------------------------------------------------------------------------
 *Prio C
 -----------------------------------------------------------------------------------------------------------------------
-- maybe refactor result saving split graph <-> simulation logging and repeated logging (?)
 - refactor visualization logic completely (its shit)
 - refactor classes / subclasses (move to separated files) (?)
-- run highlighting in runner/service (separation line or sth idk)
 - evaluate some real networks
 -----------------------------------------------------------------------------------------------------------------------
-
-Brainstorming:
-* graph generation extension
-method 1 : "100 out of 1000"
-generate 1000 graphs pick 100 with modularity closest to x
-method 2 : random graph generation instead of interpolation
-give lower and upper interval
--> choose random value from interval for each generated graph
-method 3 : combine 1 + 2
 

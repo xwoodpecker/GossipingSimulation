@@ -78,7 +78,8 @@ def apply_louvain(graph):
            graph (NetworkX graph): The graph to apply the algorithm to.
 
        Returns:
-           None
+           int: The number of communities
+           dict: The partition, with communities numbered from 0 to number of communities
        """
     # apply the Louvain method to detect communities
     partition = community.best_partition(graph)
@@ -87,7 +88,7 @@ def apply_louvain(graph):
     for node, community_id in partition.items():
         graph.nodes[node]['louvain_community'] = community_id
 
-    return max(partition.values()) + 1
+    return max(partition.values()) + 1, partition
 
 
 def compute_modularity(graph, use_louvain=False):
@@ -305,7 +306,7 @@ def prompt_comm_count():
     Returns:
         int: The number of communities entered by the user.
     """
-    return click.prompt('Enter the number of communities in the graph', type=int)
+    return click.prompt('Enter the number of communities in the graph', type=int, default=2)
 
 
 def prompt_p_intra():
@@ -1024,6 +1025,7 @@ def get_barabasi_albert_graph_name(node_count, new_edges):
     Returns:
         str: The generated graph name.
     """
+    new_edges = np.round(new_edges, decimals=4)
     return f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}-n{node_count}-e{new_edges}'
 
 
@@ -1235,13 +1237,16 @@ def get_graph_type_long(graph_type):
     return long_graph_types.get(graph_type)
 
 
-CLICK_COUNT_HELP_TEXT = 'The number of graphs to be created\n M or MxN input with M as the number of different ' \
-                        'parameters\n and N as the number of graphs generated for each set of parameters '
+CLICK_COUNT_HELP_TEXT = 'The number of graphs to be created N or MxN input with M as the number of different ' \
+                        'parameters and N as the number of graphs generated for each set of parameters.\n' \
+                        'C/N or C/NxM specifies a selection of C graphs with an approximated target metric.'
 
-CLICK_COUNT_PROMPT_TEXT = 'Enter the number of graphs that are to be generated\n' \
-                          'Either enter a single number M or an MxN input\n' \
-                          'with M as the number of different parameters\n' \
-                          'and N as the number of graphs generated for each set of parameters'
+CLICK_COUNT_PROMPT_TEXT = 'Enter the number of graphs that are to be generated.\n' \
+                          'Either enter a single number N or an MxN input ' \
+                          'with M as the number of different parameters ' \
+                          'and N as the number of graphs generated for each set of parameters.\n' \
+                          'Enter C/N or C/NxM to select C graphs from the generated graphs ' \
+                          'that have values close to a target metric.'
 
 CLICK_GRAPH_TYPE_HELP_TEXT = f'The graph type (simple, complex, scale-free, barabasi-albert or holme-kim) for the ' \
                              f'created graph '
@@ -1276,26 +1281,40 @@ def generate_graphs(count, graph_type):
             graph_type (str): The type of graph.
 
     """
-    sameParams = False
     run = True
     while run:
         try:
-            # check which if single, multiple or mxn graph generation 
+            selectSubset = False
+            subset_size = 0
+            sameParams = False
+            # check if a subset is specified
+            if '/' in count:
+                subset_size, count = count.split('/')
+                subset_size = int(subset_size)
+                selectSubset = True
+            # check whether single, multiple or mxn graph generation has to be done
             if 'x' in count:
                 M, N = count.split('x')
                 N = int(N)
                 M = int(M)
                 # Check if N and M are positive integers
                 if N > 0 and M > 0:
-                    run = False
+                    if N * M >= subset_size:
+                        run = False
+                    else:
+                        print("Can not select more graphs than the total amount generated.")
                 else:
                     print("M and N must be positive integers. Please try again.")
+
             else:
                 N = int(count)
                 # Check if N and is a positive integers
                 if N > 0:
-                    sameParams = True
-                    run = False
+                    if N >= subset_size:
+                        sameParams = True
+                        run = False
+                    else:
+                        print("Can not select more graphs than the total amount generated.")
                 else:
                     print("N must be a positive integers. Please try again.")
         except ValueError as ve:
@@ -1316,10 +1335,13 @@ def generate_graphs(count, graph_type):
     graphs = {}
     name_counts = {}
 
+    # create N graphs for the given params
+    # add them and their properties to the arrays
     def create_for_N(params):
         for _ in range(0, N):
-            graph = create_graph_func(*params)
             name = get_graph_name(graph_type, params)
+            print(f'Creating graph {name}...')
+            graph = create_graph_func(*params)
             if name not in name_counts:
                 # First occurrence of the name
                 name_counts[name] = 1
@@ -1333,77 +1355,212 @@ def generate_graphs(count, graph_type):
 
     # get the graph parameters from user input
     graph_params = get_params_func()
-    # create N graphs for the given params
-    # add them and their properties to the arrays
-    create_for_N(graph_params)
 
     # in case of MxN graph creation
-    if sameParams is False:
+    if sameParams is True:
+        # this case is for a "N" graph generation
+        # all graphs with the same params
+        create_for_N(graph_params)
+
+    else:
+        # this case is for a "MxN" graph generation
         one_by_one = click.confirm('Do you want to provide the different parameters one by one?', default=False)
         if one_by_one:
+            create_for_N(graph_params)
             # ask each set of params one by one
             for _ in range(0, M - 1):
                 graph_params = get_params_func()
                 create_for_N(graph_params)
         else:
-            print('Specify end parameters of the last set of graphs, values in between will be interpolated.')
+            interpolate = click.confirm('Do you want to interpolate the parameters? Otherwise they will be randomly '
+                                        'generated.', default=True)
+            print('Specify end parameters of the last set of graphs (end of the interval).')
             # ask for the last set of params
             end_params = get_end_params_func()
-            # interpolate the remaining parameters
-            param_lists = []
-            for i in range(0, len(graph_params)):
-                # some parameters can not be interpolated 
-                # and were therefore not prompted for the end params
-                if i < len(end_params):
-                    start = graph_params[i]
-                    end = end_params[i]
-                    values = np.linspace(start, end, M)[1:]
-                    if isinstance(start, int) and isinstance(end, int):
-                        values = values.astype(int)
-                else:
-                    values = np.full(M, graph_params[i])
-                param_lists.append(values)
 
-            # Transpose the input array to align the i-th elements from each inner array
-            transposed_params = np.transpose(np.array(param_lists, dtype='object'))
-            # Create a new structure with tuples of i-th elements from each inner array
-            graph_params_list = [tuple(row) for row in transposed_params]
+            # interpolate the remaining parameters
+
+            def interpolate_params(start_params, end_params):
+                param_lists = []
+                for i in range(0, len(start_params)):
+                    # some parameters can not be interpolated
+                    # and were therefore not prompted for the end params
+                    if i < len(end_params):
+                        start = start_params[i]
+                        end = end_params[i]
+                        values = np.linspace(start, end, M)
+                        if isinstance(start, int) and isinstance(end, int):
+                            values = values.astype(int)
+                    else:
+                        values = np.full(M, start_params[i])
+                    param_lists.append(values)
+
+                # Transpose the input array to align the i-th elements from each inner array
+                transposed_params = np.transpose(np.array(param_lists, dtype='object'))
+                # Create a new structure with tuples of i-th elements from each inner array
+                graph_params_list = [tuple(row) for row in transposed_params]
+                return graph_params_list
+
+            def randomly_generate_params(start_params, end_params):
+                param_lists = []
+                for i in range(len(start_params)):
+                    # some parameters can not be interpolated
+                    # and were therefore not prompted for the end params
+                    if i < len(end_params):
+                        start = start_params[i]
+                        end = end_params[i]
+                        if isinstance(start, int) and isinstance(end, int):
+                            values = np.random.randint(start, end + 1, M)
+                        else:
+                            values = np.random.uniform(start, end, M)
+                    else:
+                        values = np.full(M, start_params[i])
+                    param_lists.append(values)
+
+                # Transpose the input array to align the i-th elements from each inner array
+                transposed_params = np.transpose(np.array(param_lists, dtype='object'))
+                # Create a new structure with tuples of i-th elements from each inner array
+                graph_params_list = [tuple(row) for row in transposed_params]
+                return graph_params_list
+
+            if interpolate:
+                graph_params_list = interpolate_params(graph_params, end_params)
+            else:
+                graph_params_list = randomly_generate_params(graph_params, end_params)
+                new_graph_params_list = []
+                # this is a "dirty" solution for the random generation to work for scale free
+                # note that the solution makes the generation not exactly match the given interval
+                if graph_type == GRAPH_TYPE_SCALE_FREE_SHORT:
+                    for t in graph_params_list:
+                        n, a, b, c = t
+                        total = a + b + c
+                        a /= total
+                        b /= total
+                        c /= total
+                        new_t = (n, a, b, c)
+                        new_graph_params_list.append(new_t)
+                    graph_params_list = new_graph_params_list
+
             # create N graphs for each set of params
             for params in graph_params_list:
-                for _ in range(0, N):
-                    create_for_N(params)
+                create_for_N(params)
 
     # visualize in case the user wants to see the graphs
     visualize = click.confirm('Do you want to see the created graphs?', default=False)
 
     graph_modularity = {}
+    print(f'Computing graph metrics...')
     for name, graph in graphs.items():
-        print(f'Computing metrics for graph {name}:')
-        # plot the graph and show it
+        print(f'Computing metrics for graph {name}...')
+
         # compute louvain communities
-        num_communities = apply_louvain(graph)
+        num_communities, partition = apply_louvain(graph)
+        graph_properties[name]['numCommunities'] = num_communities
+
+        avg_clustering_per_community = nx.clustering(graph, partition)
+        overall_average_clustering = sum(avg_clustering_per_community.values()) / len(avg_clustering_per_community)
+        graph_properties[name]['overallAverageCommunityClustering'] = overall_average_clustering
+
         # compute actual modularity based on the louvain communities
         computed_modularity = compute_modularity(graph, use_louvain=True)
-        print(f'The graph has a computed modularity of {computed_modularity}.')
+        graph_modularity[name] = computed_modularity
+        # print(f'The graph has a computed modularity of {computed_modularity}.')
 
         computed_avg_degree = compute_average_edge_degree(graph)
-        print(f'The graph has a computed average degree of {computed_avg_degree}.')
+        # print(f'The graph has a computed average degree of {computed_avg_degree}.')
+        graph_properties[name]['averageEdgeDegree'] = computed_avg_degree
+
         # computed_power_law_exp, lower_bound = compute_power_law(graph)
         # print(f'The graph has a computed power law of {computed_avg_degree} with lower bound {lower_bound}.')
-        computed_avg_path_length = compute_average_path_length(graph)
-        print(f'The graph has a computed avg path length of {computed_avg_path_length}.')
-        computed_clust_coefficient = compute_cluster_coefficient(graph)
-        print(f'The graph has a computed cluster coefficient of {computed_clust_coefficient}.')
-
-        graph_properties[name]['averageEdgeDegree'] = computed_avg_degree
         # graph_properties[name]['estimatedPowerLawExponent'] = computed_power_law_exp
         # graph_properties[name]['lowerBoundPowerLawRegion'] = lower_bound
-        graph_properties[name]['averagePathLength'] = computed_avg_path_length
-        graph_properties[name]['clusterCoefficient'] = computed_clust_coefficient
-        graph_modularity[name] = computed_modularity
 
+        computed_avg_path_length = compute_average_path_length(graph)
+        # print(f'The graph has a computed avg path length of {computed_avg_path_length}.')
+        graph_properties[name]['averagePathLength'] = computed_avg_path_length
+
+        computed_clust_coefficient = compute_cluster_coefficient(graph)
+        # print(f'The graph has a computed cluster coefficient of {computed_clust_coefficient}.')
+        graph_properties[name]['clusterCoefficient'] = computed_clust_coefficient
+
+        degree_centrality = nx.degree_centrality(graph)
+        average_degree_centrality = sum(degree_centrality.values()) / len(degree_centrality)
+        graph_properties[name]['averageDegreeCentrality'] = average_degree_centrality
+
+        betweenness_centrality = nx.betweenness_centrality(graph)
+        average_betweenness_centrality = sum(betweenness_centrality.values()) / len(betweenness_centrality)
+        graph_properties[name]['averageBetweennessCentrality'] = average_betweenness_centrality
+
+        closeness_centrality = nx.closeness_centrality(graph)
+        average_closeness_centrality = sum(closeness_centrality.values()) / len(closeness_centrality)
+        graph_properties[name]['averageClosenessCentrality'] = average_closeness_centrality
+
+        # eigenvector_centrality = nx.eigenvector_centrality(graph)
+        # graph_properties[name]['eigenvectorCentrality'] = eigenvector_centrality
+
+        assortativity = nx.degree_assortativity_coefficient(graph)
+        graph_properties[name]['assortativity'] = assortativity
+
+
+        density = nx.density(graph)
+        graph_properties[name]['density'] = density
+
+        diameter = nx.diameter(graph)
+        graph_properties[name]['diameter'] = diameter
+
+    if selectSubset:
+        # Retrieve all the keys from the graph_properties dictionary
+        all_keys = set()
+        for value in graph_properties.values():
+            all_keys.update(value.keys())
+        all_keys = list(all_keys)
+        # todo: maybe replace this with a fixed set of graph_properties (select all metrics)
+        # todo: add modularity
+
+        prompt_text = "Select which metric to approximate.\n"
+
+        # Generate the mapping of numbers to key names
+        mapping = "\n".join([f"{i + 1} - {key}" for i, key in enumerate(all_keys)])
+
+        # Append the mapping to the prompt text
+        prompt_text += mapping
+
+        choices = [str(num) for num in range(1, len(all_keys) + 1)]
+        # Prompt the user for input
+        choice = click.prompt(prompt_text, type=click.Choice(choices))
+        chosen_key = all_keys[int(choice) - 1]
+        sorted_graph_properties = dict(sorted(graph_properties.items(), key=lambda x: x[1][chosen_key]))
+        sorted_graphs = {name: graphs[name] for name in sorted_graph_properties.keys()}
+        sorted_chosen_values = [item[chosen_key] for item in sorted_graph_properties.values()]
+        print(f'Values of {chosen_key} for graphs:\n'
+              f'Minimum:{min(sorted_chosen_values)}\n'
+              f'Maximum:{max(sorted_chosen_values)}')
+
+        value_to_approximate \
+            = click.prompt('Enter the value to approximate', type=type(sorted_chosen_values[0]))
+
+        closest_graph_properties_subset = {}
+        closest_graphs_subset = {}
+        for i in range(subset_size):
+            closest_value = min(sorted_chosen_values, key=lambda x: abs(x - value_to_approximate))
+            index = sorted_chosen_values.index(closest_value)
+            closest_graph_name = list(sorted_graphs.keys())[index]
+            closest_graph_properties = sorted_graph_properties[closest_graph_name]
+            closest_graph = sorted_graphs[closest_graph_name]
+
+            closest_graph_properties_subset[closest_graph_name] = closest_graph_properties
+            closest_graphs_subset[closest_graph_name] = closest_graph
+            sorted_chosen_values.pop(index)
+            del sorted_graphs[closest_graph_name]
+            del sorted_graph_properties[closest_graph_name]
+
+        graphs = closest_graphs_subset
+        graph_properties = closest_graph_properties_subset
+
+    for name, graph in graphs.items():
+        # plot the graph and show it
         if visualize:
-            plot(graph, num_communities, use_louvain=True)
+            plot(graph, graph_properties[name]['numCommunities'], use_louvain=True)
 
     choice = click.prompt('Do you want to save the graphs as adjacency lists or create a k8s graph resource?',
                           type=click.Choice(['adj', 'k8s']), default='k8s')
