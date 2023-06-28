@@ -1,3 +1,4 @@
+import math
 import time
 import json
 import kopf
@@ -34,12 +35,14 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
     graph_dict = {}  # Dictionary to store graph name and graph spec
 
     if 'name' in match_labels:
+        series_simulation = False
         # Select a single graph based on 'name' label
         graph_name = match_labels['name']
         graph_obj = customs_api.get_namespaced_custom_object('gossip.io', 'v1', namespace, 'graphs', graph_name)
         graph_dict[graph_name] = graph_obj['spec']
         logger.info(f"Selected graph '{graph_name}' from graphSelector.")
     elif 'series' in match_labels:
+        series_simulation = True
         # Select multiple graphs based on 'series' label
         series_name = match_labels['series']
         # Retrieve all graphs in the series based on the 'series' label
@@ -55,8 +58,8 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         logger.info(f'Creating simulation for graph {graph_name}.')
         is_last_graph_spec = (graph_index == len(graph_dict) - 1)
         # Convert the adjacency list from a comma-separated string to a list of tuples
-        str_adj_list = graph_spec.get('adjacencyList', '').rstrip(',')
-        split_adj_list = str_adj_list.split(',')
+        split_adj_list = graph_spec.get('adjacencyList', '')
+        str_adj_list = '\n'.join(split_adj_list)
         adjacency_list = []
         for edge_str in split_adj_list:
             if edge_str:
@@ -192,100 +195,133 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             Returns:
                 None
             """
+            batch_size = 100
+            num_nodes = len(nodes)
+            num_batches = math.ceil(num_nodes / batch_size)
 
             # Create a dictionary to store the Pod names and their node number
             # Create a Pod for each node in the graph
-            for node in nodes:
-                # Create a Pod for this node
-                pod_name = get_resource_name(graph_index, name, node)
+            for batch_index in range(num_batches):
+                start_index = batch_index * batch_size
+                end_index = min((batch_index + 1) * batch_size, num_nodes)
+                batch_nodes = nodes[start_index:end_index]
 
-                labels = {
-                    'app': 'gossip',
-                    'simulation': name,
-                    'graph': graph_name,
-                    'node': str(node)
-                }
+                for node in batch_nodes:
+                    # Create a Pod for this node
+                    pod_name = get_resource_name(graph_index, name, node)
 
-                env = []
+                    labels = {
+                        'app': 'gossip',
+                        'simulation': name,
+                        'graph': graph_name,
+                        'node': str(node)
+                    }
 
-                # set environment variables
-                neighbors_str = ','.join([get_resource_name(graph_index, name, n) for n in neighbors[node]])
-                env.append(client.V1EnvVar(name=ENVIRONMENT_NEIGHBORS, value=neighbors_str))
-                env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
-                env.append(client.V1EnvVar(name=ENVIRONMENT_RANDOM_INITIALIZATION, value=str(randomInitialization)))
-                if not randomInitialization:
-                    env.append(client.V1EnvVar(name=ENVIRONMENT_NODE_VALUE, value=str(node_values[node])))
+                    env = []
 
-                # weighted factor algorithm specific environment variables
-                if algorithm in WEIGHTED_FACTOR_SET:
-                    # set the community neighbors of the current node
-                    community_id = node_community_dict[node]
-                    community_nodes = community_node_dict[community_id]
-                    # extract community and non-community neighbors
-                    neighbor_nodes = set(neighbors[node])
-                    community_neighbors = []
-                    # non_community_neighbors = []
-                    for neighbor_node in neighbor_nodes:
-                        if neighbor_node in community_nodes:
-                            community_neighbors.append(neighbor_node)
+                    # set environment variables
+                    neighbors_str = ','.join([get_resource_name(graph_index, name, n) for n in neighbors[node]])
+                    env.append(client.V1EnvVar(name=ENVIRONMENT_NEIGHBORS, value=neighbors_str))
+                    env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
+                    env.append(client.V1EnvVar(name=ENVIRONMENT_RANDOM_INITIALIZATION, value=str(randomInitialization)))
+                    if not randomInitialization:
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_NODE_VALUE, value=str(node_values[node])))
 
-                    community_neighbors_str = ','.join([get_resource_name(graph_index, name, n) for n in community_neighbors])
-                    env.append(client.V1EnvVar(name=ENVIRONMENT_COMMUNITY_NEIGHBORS, value=community_neighbors_str))
-                    env.append(client.V1EnvVar(name=ENVIRONMENT_FACTOR, value=str(factor)))
+                    # weighted factor algorithm specific environment variables
+                    if algorithm in WEIGHTED_FACTOR_SET:
+                        # set the community neighbors of the current node
+                        community_id = node_community_dict[node]
+                        community_nodes = community_node_dict[community_id]
+                        # extract community and non-community neighbors
+                        neighbor_nodes = set(neighbors[node])
+                        community_neighbors = []
+                        # non_community_neighbors = []
+                        for neighbor_node in neighbor_nodes:
+                            if neighbor_node in community_nodes:
+                                community_neighbors.append(neighbor_node)
 
-                # community probabilities algorithm specific environment variables
-                if algorithm in COMMUNITY_PROBABILITIES_SET:
-                    # set the same community probabilities of the neighbors for the current node
-                    community_id = node_community_dict[node]
-                    neighbor_nodes = neighbors[node]
+                        community_neighbors_str = ','.join([get_resource_name(graph_index, name, n) for n in community_neighbors])
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_COMMUNITY_NEIGHBORS, value=community_neighbors_str))
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_FACTOR, value=str(factor)))
 
-                    same_community_probabilities_neighbors = []
-                    for neighbor in neighbor_nodes:
-                        neighbor_community_probabilities = community_probabilities[neighbor]
-                        same_community_probabilities_neighbors.append(neighbor_community_probabilities[community_id])
+                    # community probabilities algorithm specific environment variables
+                    if algorithm in COMMUNITY_PROBABILITIES_SET:
+                        # set the same community probabilities of the neighbors for the current node
+                        community_id = node_community_dict[node]
+                        neighbor_nodes = neighbors[node]
 
-                    same_community_probabilities_neighbors_str = ','.join(
-                        str(round(item, COMMUNITY_PROBABILITIES_ROUNDING))
-                        for item
-                        in same_community_probabilities_neighbors
+                        same_community_probabilities_neighbors = []
+                        for neighbor in neighbor_nodes:
+                            neighbor_community_probabilities = community_probabilities[neighbor]
+                            same_community_probabilities_neighbors.append(neighbor_community_probabilities[community_id])
+
+                        same_community_probabilities_neighbors_str = ','.join(
+                            str(round(item, COMMUNITY_PROBABILITIES_ROUNDING))
+                            for item
+                            in same_community_probabilities_neighbors
+                        )
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_SAME_COMMUNITY_PROBABILITIES_NEIGHBORS,
+                                                   value=same_community_probabilities_neighbors_str))
+
+                    # memory algorithm specific environment variables
+                    if algorithm in MEMORY_SET:
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_PRIOR_PARTNER_FACTOR, value=str(prior_partner_factor)))
+
+                    # Create the container for the Pod
+                    container = client.V1Container(
+                        name=DOCKER_NODE_NAME,
+                        image=DOCKER_NODE_IMAGE,
+                        env=env,
+                        ports=[
+                            client.V1ContainerPort(container_port=TCP_SERVICE_PORT, name='tcp'),
+                            client.V1ContainerPort(container_port=GRPC_SERVICE_PORT, name='grpc')
+                        ]
                     )
-                    env.append(client.V1EnvVar(name=ENVIRONMENT_SAME_COMMUNITY_PROBABILITIES_NEIGHBORS,
-                                               value=same_community_probabilities_neighbors_str))
 
-                # memory algorithm specific environment variables
-                if algorithm in MEMORY_SET:
-                    env.append(client.V1EnvVar(name=ENVIRONMENT_PRIOR_PARTNER_FACTOR, value=str(prior_partner_factor)))
-
-                # Create the container for the Pod
-                container = client.V1Container(
-                    name=DOCKER_NODE_NAME,
-                    image=DOCKER_NODE_IMAGE,
-                    env=env,
-                    ports=[
-                        client.V1ContainerPort(container_port=TCP_SERVICE_PORT, name='tcp'),
-                        client.V1ContainerPort(container_port=GRPC_SERVICE_PORT, name='grpc')
-                    ]
-                )
-
-                # define the pod
-                pod = client.V1Pod(
-                    metadata=client.V1ObjectMeta(
-                        name=pod_name,
-                        namespace=namespace,
-                        labels=labels
-                    ),
-                    spec=client.V1PodSpec(
-                        restart_policy='OnFailure',
-                        containers=[container]
+                    # define the pod
+                    pod = client.V1Pod(
+                        metadata=client.V1ObjectMeta(
+                            name=pod_name,
+                            namespace=namespace,
+                            labels=labels
+                        ),
+                        spec=client.V1PodSpec(
+                            restart_policy='OnFailure',
+                            containers=[container],
+                            image_pull_secrets=[client.V1LocalObjectReference(name=REGISTRY_SECRET_NAME)],
+                            topology_spread_constraints=[
+                                client.V1TopologySpreadConstraint(
+                                    max_skew=1,
+                                    topology_key="simulation_node",
+                                    when_unsatisfiable="DoNotSchedule",
+                                    label_selector=client.V1LabelSelector(
+                                        match_labels={
+                                            "app": "gossip"
+                                        }
+                                    )
+                                )
+                            ]
+                        )
                     )
-                )
-                try:
-                    # create the pod in the current namespace
-                    api.create_namespaced_pod(namespace=namespace, body=pod)
-                    logger.info(f'Pod {pod_name} created.')
-                    pods.append(pod_name)
-                except ApiException as e:
-                    logger.error(f'Error creating pod: {e}')
+                    try:
+                        # create the pod in the current namespace
+                        api.create_namespaced_pod(namespace=namespace, body=pod)
+                        logger.info(f'Pod {pod_name} created.')
+                        pods.append(pod_name)
+                    except ApiException as e:
+                        logger.error(f'Error creating pod: {e}')
+
+                # Wait for the pods in this batch to start
+                logger.info(f'Waiting for node pods in batch {batch_index + 1}/{num_batches} to start...')
+                while True:
+                    # List all pods matching the specified labels
+                    node_pods = api.list_namespaced_pod(namespace=namespace, label_selector=','.join(
+                        [f"{k}={v}" for k, v in labels.items()]))
+
+                    # Check if all pods in this batch are in the "Running" state
+                    if all(pod.status.phase == 'Running' for pod in node_pods.items):
+                        logger.info(f'All node pods in batch {batch_index + 1}/{num_batches} are now running.')
+                        break
 
             logger.info(f'Finished creating Pods for simulation {name} on graph {graph_name}.')
 
@@ -351,9 +387,8 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         repetitions = spec.get('repetitions', 1)
         visualize = spec.get('visualize', False)
         simulationProperties = spec.get('simulationProperties', {})
-        # get graph settings frrom the graph spec
+        # get graph settings from the graph spec
         graphType = graph_spec.get('graphType', 'normal')
-        modularity = graph_spec.get('modularity', None)
         graphProperties = graph_spec.get('graphProperties', {})
 
         def create_runner_pod():
@@ -379,6 +414,8 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             env = []
             # set all necessary environment variables
             env.append(client.V1EnvVar(name=ENVIRONMENT_SIMULATION, value=name))
+            env.append(client.V1EnvVar(name=ENVIRONMENT_SERIES_SIMULATION, value=str(series_simulation)))
+            env.append(client.V1EnvVar(name=ENVIRONMENT_GRAPH_NAME, value=graph_name))
             env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
             env.append(client.V1EnvVar(name=ENVIRONMENT_REPETITIONS, value=str(repetitions)))
             env.append(client.V1EnvVar(name=ENVIRONMENT_ADJ_LIST, value=str_adj_list))
@@ -399,8 +436,6 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             # graph properties for logging
             graph_properties = graphProperties.copy()
             graph_properties['GraphType'] = graphType
-            if modularity:
-                graph_properties['Modularity'] = modularity
             graph_properties_string = json.dumps(graph_properties)
             env.append(client.V1EnvVar(name=ENVIRONMENT_GRAPH_PROPERTIES, value=graph_properties_string))
 
@@ -431,7 +466,8 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                 ),
                 spec=client.V1PodSpec(
                     restart_policy='OnFailure',
-                    containers=[container]
+                    containers=[container],
+                    image_pull_secrets=[client.V1LocalObjectReference(name=REGISTRY_SECRET_NAME)]
                 )
             )
             try:

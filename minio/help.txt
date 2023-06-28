@@ -4,8 +4,12 @@ kubectl get secret --namespace default minio -o jsonpath="{.data.root-user}"
 d:YWRtaW4=
 e:admin
 kubectl get secret --namespace default minio -o jsonpath="{.data.root-password}"
+minikube
 d:VUxlWjR6Y1lJOQ==
 e:ULeZ4zcYI9
+cluster:
+d:UzRQZWs3Qjhnbg==
+e:S4Pek7B8gn
 
 kubectl edit svc my-minio
 change:

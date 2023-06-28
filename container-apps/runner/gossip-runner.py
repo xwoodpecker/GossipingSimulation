@@ -16,6 +16,7 @@ import networkx as nx
 import pygraphviz as pgv
 from minio import Minio
 from minio.error import S3Error
+import logging
 
 sys.path.append("/app/grpc_compiled")
 import gossip_pb2
@@ -113,6 +114,7 @@ class Result:
             adj_list (dict): The adjacency list representation of the graph.
             graph_metadata (dict, optional): Additional metadata about the graph. Defaults to None.
         """
+        self.timestamp = datetime.datetime.now().strftime(RESULT_TIME_FORMAT_STRING)
         self.num_rounds = num_rounds
         self.algorithm = algorithm_data.name
         self.simulation_properties = algorithm_data.properties
@@ -264,7 +266,7 @@ class GossipRunner:
         """
         self.buffer_dict = {}
         for node in self.nodes:
-            print(f"Invoking Reset for node {node}.")
+            logging.info(f"Invoking Reset for node {node}.")
             response = self.stub_dict[node].Reset(gossip_pb2.ResetRequest())
 
     def init_graph_plot(self, num_comm=0):
@@ -295,12 +297,12 @@ class GossipRunner:
                 # Convert the HSV color to an RGB color and append it to the list
                 rgb = tuple(int(255 * x) for x in colorsys.hsv_to_rgb(hue, saturation, brightness))
                 colors.append(rgb)
-            print(f'Generated {num_colors} colors for visualization')
+            logging.info(f'Generated {num_colors} colors for visualization')
             return colors
 
         if num_comm > 0:
             colors = generate_colors(num_comm)
-            print(f'Community colors generated')
+            logging.info(f'Community colors generated')
 
         # initialie the pgv graph
         g = pgv.AGraph(directed=False)
@@ -319,13 +321,13 @@ class GossipRunner:
                 else:
                     node_color = DEFAULT_NODE_COLOR
                 g.add_node(node, style='filled', fillcolor=node_color)
-                print(f'Added node {node} with color {node_color} to pgv graph')
-            print(f'All nodes set for pgv graph')
+                logging.info(f'Added node {node} with color {node_color} to pgv graph')
+            logging.info(f'All nodes set for pgv graph')
 
             # Add edges to the graph
             for edge in self.graph.edges():
                 g.add_edge(edge[0], edge[1])
-            print(f'All edges added for pgv graph')
+            logging.info(f'All edges added for pgv graph')
         else:
             if num_comm > 0:
                 # Add communities as nodes to the new graph
@@ -341,10 +343,24 @@ class GossipRunner:
                     if community1 != community2:
                         g.add_edge(community1, community2)
             else:
-                print('No communities but too many nodes present, no pgv graph will be set.')
+                logging.info('No communities but too many nodes present, no pgv graph will be set.')
                 return
         # set the gpv graph to the local var
         self.pgv_graph = g
+
+    def generate_gexf(self, round_num):
+        """
+        Create the gephi graph file
+
+        Args:
+            round_num (int): The current round number.
+        """
+        # Draw the graph to a byte buffer
+        buffer = io.BytesIO()
+        nx.write_gexf(self.graph, buffer)
+        self.buffer_dict[round_num] = buffer
+        logging.info(f'Created gephi file for graph {graph_name} in round {round_num}')
+
 
     def plot_graph(self, round_num, num_comm=0):
         """
@@ -374,7 +390,7 @@ class GossipRunner:
                     label = f"<<b>{round(avg_value, 2)}</b>>"
                     self.pgv_graph.get_node(i).attr['label'] = label
             else:
-                print('No graph will be rendered when more than 100 nodes are present and no communities exist')
+                logging.info('No graph will be rendered when more than 100 nodes are present and no communities exist')
                 return
 
         # Layout the graph
@@ -384,7 +400,7 @@ class GossipRunner:
         buffer = io.BytesIO()
         self.pgv_graph.draw(buffer, format='png')
         self.buffer_dict[round_num] = buffer
-        print(f'Created plot for simulation {simulation_name} in round {round_num}')
+        logging.info(f'Created plot for graph {graph_name} in round {round_num}')
 
     def update_graph_node(self, node, value):
         """
@@ -416,7 +432,7 @@ class GossipRunner:
         if not found:
             client.make_bucket(MINIO_BUCKET_NAME)
         else:
-            print(f"Bucket '{MINIO_BUCKET_NAME}' already exists")
+            logging.info(f"Bucket '{MINIO_BUCKET_NAME}' already exists")
 
         return client
 
@@ -429,69 +445,85 @@ class GossipRunner:
 
             current_date = datetime.datetime.now().strftime(MINIO_TIME_FORMAT_STRING)
 
+            self.simulation_path = f'{simulation_name}-{current_date}/{graph_name}'
+            object_path = self.simulation_path
             if self.repeated:
-                if self.run_number == 1:
-                    self.simulation_path = object_path = f'{simulation_name}-{current_date}'
-                object_path = self.simulation_path + f'/run-{self.run_number}'
-            else:
-                object_path = f'{simulation_name}-{current_date}'
+                object_path += f'/run-{self.run_number}'
 
-            images = {}
-            max_width = 0
-            max_height = 0
-            for round_num, buffer in self.buffer_dict.items():
-                object_name = f'{simulation_name}-round-{round_num}'
-                file_size = buffer.getbuffer().nbytes
-                buffer.seek(0)  # Rewind the buffer to the beginning
-                client.put_object(
-                    MINIO_BUCKET_NAME,
-                    f'{object_path}/rounds/{object_name}.png',
-                    buffer,
-                    file_size,
-                    content_type="image/png"
-                )
-                print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
-                img = Image.open(buffer)
-                images[round_num] = img
-                # find  the largest image
-                max_width = max(max_width, img.width)
-                max_height = max(max_height, img.height)
+            def store_images_gifs():
+                images = {}
+                max_width = 0
+                max_height = 0
+                for round_num, buffer in self.buffer_dict.items():
+                    object_name = f'round-{round_num}'
+                    file_size = buffer.getbuffer().nbytes
+                    buffer.seek(0)  # Rewind the buffer to the beginning
+                    client.put_object(
+                        MINIO_BUCKET_NAME,
+                        f'{object_path}/rounds/{object_name}.png',
+                        buffer,
+                        file_size,
+                        content_type="image/png"
+                    )
+                    logging.info(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
+                    img = Image.open(buffer)
+                    images[round_num] = img
+                    # find  the largest image
+                    max_width = max(max_width, img.width)
+                    max_height = max(max_height, img.height)
 
-            gif_images = []
-            for round_num, image in images.items():
-                title = f"Round#{round_num}"
-                # Create a new image with enough space for the original image and the text below it
-                new_image = Image.new('RGB', (max_width, max_height + 50), color=(255, 255, 255))
-                # Paste the original image into the new image
-                new_image.paste(image, (0, 0))
-                # Draw the text at the bottom of the new image
-                draw = ImageDraw.Draw(new_image)
-                text_bbox = draw.textbbox((0, image.height, new_image.width, new_image.height), title)
-                text_width = text_bbox[2] - text_bbox[0]
-                text_x = (new_image.width - text_width) / 2
-                text_y = image.height + 10
-                draw.text((text_x, text_y), title, fill=(0, 0, 0))
-                gif_images.append(new_image)
+                gif_images = []
+                for round_num, image in images.items():
+                    title = f"Round#{round_num}"
+                    # Create a new image with enough space for the original image and the text below it
+                    new_image = Image.new('RGB', (max_width, max_height + 50), color=(255, 255, 255))
+                    # Paste the original image into the new image
+                    new_image.paste(image, (0, 0))
+                    # Draw the text at the bottom of the new image
+                    draw = ImageDraw.Draw(new_image)
+                    text_bbox = draw.textbbox((0, image.height, new_image.width, new_image.height), title)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_x = (new_image.width - text_width) / 2
+                    text_y = image.height + 10
+                    draw.text((text_x, text_y), title, fill=(0, 0, 0))
+                    gif_images.append(new_image)
 
-            if len(gif_images) > 0:
-                with io.BytesIO() as output:
-                    # show one frame for 4 seconds
-                    imageio.mimsave(output, gif_images, format='GIF', fps=1 / 4)
+                if len(gif_images) > 0:
+                    with io.BytesIO() as output:
+                        # show one frame for 4 seconds
+                        imageio.mimsave(output, gif_images, format='GIF', fps=1 / 4)
 
-                    # Create another BytesIO instance and write the gif_bytes to it
-                    gif_buffer = io.BytesIO(output.getvalue())
+                        # Create another BytesIO instance and write the gif_bytes to it
+                        gif_buffer = io.BytesIO(output.getvalue())
 
-                object_name = f'{simulation_name}_visualized'
-                file_size = len(gif_buffer.getbuffer())
-                gif_buffer.seek(0)  # Rewind the buffer to the beginning
-                client.put_object(
-                    MINIO_BUCKET_NAME,
-                    f'{object_path}/{object_name}.gif',
-                    gif_buffer,
-                    file_size,
-                    content_type="image/gif"
-                )
-                print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
+                    object_name = f'{simulation_name}_visualized'
+                    file_size = len(gif_buffer.getbuffer())
+                    gif_buffer.seek(0)  # Rewind the buffer to the beginning
+                    client.put_object(
+                        MINIO_BUCKET_NAME,
+                        f'{object_path}/{object_name}.gif',
+                        gif_buffer,
+                        file_size,
+                        content_type="image/gif"
+                    )
+                    logging.info(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
+
+            def store_gexf_files():
+                for round_num, buffer in self.buffer_dict.items():
+                    object_name = f'{graph_name}-round-{round_num}'
+                    file_size = buffer.getbuffer().nbytes
+                    buffer.seek(0)  # Rewind the buffer to the beginning
+                    client.put_object(
+                        MINIO_BUCKET_NAME,
+                        f'{object_path}/rounds/{object_name}.gexf',
+                        buffer,
+                        file_size,
+                        content_type='application/xml'
+                    )
+                    logging.info(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
+
+            # store_images_gifs()
+            store_gexf_files()
 
             result = Result(self.num_rounds, self.algorithm_data, self.graph_data.adj_list, self.graph_data.properties)
             if self.repeated:
@@ -505,7 +537,7 @@ class GossipRunner:
                 content_type="application/json",
                 # metadata={"": ""},
             )
-            print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
+            logging.info(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
 
             object_name = f'{simulation_name}_node_value_history'
             client.put_object(
@@ -516,10 +548,10 @@ class GossipRunner:
                 content_type="application/json",
                 # metadata={"": ""},
             )
-            print(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
+            logging.info(f"Successfully uploaded '{object_name}' to bucket '{MINIO_BUCKET_NAME}'.")
 
         except S3Error as exc:
-            print("minio error occurred: ", exc)
+            logging.error("minio error occurred: ", exc)
 
     def store_average_results(self):
         """
@@ -543,7 +575,7 @@ class GossipRunner:
                 # metadata={"": ""},
             )
         except S3Error as exc:
-            print("minio error occurred: ", exc)
+            logging.error("minio error occurred: ", exc)
 
     def grpc_current_value(self, stub):
         return stub.CurrentValue(gossip_pb2.CurrentValueRequest())
@@ -567,19 +599,20 @@ class GossipRunner:
         # Wait for all the calls to finish
         concurrent.futures.wait(futures)
         value_responses = [future.result() for future in futures]
-        print('Debug: all async current value tasks completed')
+        logging.info('Debug: all async current value tasks completed')
 
         for i, node in enumerate(self.stub_dict):
             response = value_responses[i]
             if isinstance(response, Exception):
-                print(f"Error receiving current value on node {node}: {response}")
+                logging.error(f"Error receiving current value on node {node}: {response}")
             else:
                 value = int(response.value)
-                print(f"Node {node} has initial value {value}.")
+                logging.info(f"Node {node} has initial value {value}.")
                 self.node_value_history.add(0, self.graph_data.node_dict[node], value)
                 self.update_graph_node(node, value)
         if self.graph_data.visualize:
-            self.plot_graph(0, self.graph_data.num_communities)
+            # self.plot_graph(0, self.graph_data.num_communities)
+            self.generate_gexf(0)
 
     def run(self):
         """
@@ -587,14 +620,14 @@ class GossipRunner:
         """
         round_num = 1
         while True:
-            print(f"Starting round {round_num} of gossiping...")
+            logging.info(f"Starting round {round_num} of gossiping...")
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
             # Submit the gRPC calls to the executor
             futures = [executor.submit(self.grpc_gossip, self.stub_dict[node]) for node in self.stub_dict]
             # Wait for all the calls to finish
             concurrent.futures.wait(futures)
-            print('Debug: all async gossip tasks completed')
-            print(f"Round {round_num} of gossiping ended. Printing results.")
+            logging.info('Debug: all async gossip tasks completed')
+            logging.info(f"Round {round_num} of gossiping ended. logging.infoing results.")
 
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
             # Submit the gRPC calls to the executor
@@ -602,47 +635,48 @@ class GossipRunner:
             # Wait for all the calls to finish
             concurrent.futures.wait(futures)
             value_responses = [future.result() for future in futures]
-            print('Debug: all async current value tasks completed')
+            logging.info('Debug: all async current value tasks completed')
 
             values = []
             for i, node in enumerate(self.stub_dict):
                 response = value_responses[i]
                 if isinstance(response, Exception):
-                    print(f"Error receiving current value on node {node}: {response}")
+                    logging.error(f"Error receiving current value on node {node}: {response}")
                 else:
                     value = int(response.value)
                     values.append(value)
-                    print(f"Node {node} has value {value}.")
+                    logging.info(f"Node {node} has value {value}.")
                     values.append(value)
                     self.node_value_history.add(round_num, self.graph_data.node_dict[node], value)
                     self.update_graph_node(node, value)
             if self.graph_data.visualize:
-                self.plot_graph(round_num, self.graph_data.num_communities)
+                # self.plot_graph(round_num, self.graph_data.num_communities)
+                self.generate_gexf(round_num)
             if all(value == values[0] for value in values):
-                print(f"All hosts have converged on value {values[0]}")
+                logging.info(f"All hosts have converged on value {values[0]}")
                 break
             round_num += 1
-        print(f"The full value history for this run: {self.node_value_history}")
+        logging.info(f"The full value history for this run: {self.node_value_history}")
         self.num_rounds = round_num
 
     def stop_node_applications(self):
         """
         Stop all node applications over gRPC asynchronously.
         """
-        print(f"Stopping node applications...")
+        logging.info(f"Stopping node applications...")
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
         # Submit the gRPC calls to the executor
         futures = [executor.submit(self.grpc_stop_application, self.stub_dict[node]) for node in self.stub_dict]
         # Wait for all the calls to finish
         concurrent.futures.wait(futures)
         stop_app_responses = [future.result() for future in futures]
-        print('Debug: all async stop application tasks completed')
+        logging.info('Debug: all async stop application tasks completed')
 
         for node, response in zip(self.stub_dict, stop_app_responses):
             if isinstance(response, Exception):
-                print(f"Error stopping application on node {node}: {response}")
+                logging.error(f"Error stopping application on node {node}: {response}")
             else:
-                print(f"Successfully stopped application on node {node}")
+                logging.info(f"Successfully stopped application on node {node}")
 
 
 def create_graph(adj_list):
@@ -656,15 +690,15 @@ def create_graph(adj_list):
         graph (networkx.Graph): The created graph.
     """
     # Read the adjacency list and create a graph
-    print(f'Creating graph for adjacency list: {adj_list}')
+    logging.info(f'Creating graph for adjacency list: {adj_list}')
     graph = nx.parse_adjlist(adj_list.split(','))
-    print(f'Graph created with nodes: {graph.nodes}')
+    logging.info(f'Graph created with nodes: {graph.nodes}')
     return graph
 
 
 if __name__ == '__main__':
 
-    print('Gossip runner started.')
+    logging.info('Gossip runner started.')
     # minio environment variables
     minio_endpoint = os.environ.get(ENVIRONMENT_MINIO_ENDPOINT)
     minio_user = os.environ.get(ENVIRONMENT_MINIO_USER)
@@ -674,9 +708,20 @@ if __name__ == '__main__':
     simulation_name = os.environ.get(ENVIRONMENT_SIMULATION)
     if simulation_name is None:
         simulation_name = DEFAULT_SIMULATION_NAME
+    graph_name = os.environ.get(ENVIRONMENT_GRAPH_NAME)
+    if graph_name is None:
+        graph_name = DEFAULT_GRAPH_NAME
     algorithm = os.environ.get(ENVIRONMENT_ALGORITHM)
     if algorithm is None:
         algorithm = DEFAULT_ALGORITHM
+        # env for series simulation
+    series_simulation_str = os.environ.get(ENVIRONMENT_SERIES_SIMULATION)
+    if series_simulation_str is None:
+        visualize_str = ''
+    if series_simulation_str.lower() == 'false':
+        series_simulation = False
+    else:
+        series_simulation = True
     # node communities specific variable
     node_communities = None
     if algorithm in NODE_COMMUNITIES_SET:
@@ -692,7 +737,7 @@ if __name__ == '__main__':
     repeated = False
     if repetitions > 1:
         repeated = True
-        print(f'Repeated execution of simulation for a total of {repetitions} runs')
+        logging.info(f'Repeated execution of simulation for a total of {repetitions} runs')
     # load simulation properties for logging
     try:
         simulation_properties = json.loads(os.environ.get(ENVIRONMENT_SIMULATION_PROPERTIES))
@@ -725,7 +770,7 @@ if __name__ == '__main__':
 
     # nodes = sorted(nodes, key=natural_sort_key)
 
-    print(f"Received network nodes: {nodes}")
+    logging.info(f"Received network nodes: {nodes}")
     # env for visualization settings
     visualize_str = os.environ.get(ENVIRONMENT_VISUALIZE)
     if visualize_str is None:
@@ -747,7 +792,8 @@ if __name__ == '__main__':
 
     # repeat for additional repetitions
     for i in range(1, repetitions):
-        print(f'Repeated Run #{i + 1} executing...')
+        logging.info("\n\n")
+        logging.info(f'Repeated Run #{i + 1} executing...')
         runner.init_next_run()
         runner.init_node_value_history()
         runner.run()
@@ -758,5 +804,5 @@ if __name__ == '__main__':
 
     # stop all nodes over grpc
     runner.stop_node_applications()
-    print("Stopping application.")
+    logging.info("Stopping application.")
     sys.exit(0)

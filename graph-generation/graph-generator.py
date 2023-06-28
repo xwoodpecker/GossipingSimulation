@@ -2,7 +2,10 @@ import colorsys
 import io
 import os
 import random
+import statistics
 import sys
+import warnings
+from collections import Counter
 
 import click
 import community
@@ -13,6 +16,7 @@ import numpy as np
 import pygraphviz as pgv
 import yaml
 from PIL import Image
+from networkx import PowerIterationFailedConvergence
 
 import random_modular_generator_variable_modules as rmg
 import sequence_generator as sg
@@ -20,6 +24,8 @@ from cfg import *
 
 # for powerlaw package
 numpy.seterr(divide='ignore', invalid='ignore')
+# for nx scipy interaction
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 # the code below can be used to generate really big images
@@ -86,26 +92,24 @@ def apply_louvain(graph):
 
     # mark the communities in the graph
     for node, community_id in partition.items():
-        graph.nodes[node]['louvain_community'] = community_id
+        graph.nodes[node]['community'] = community_id
 
     return max(partition.values()) + 1, partition
 
 
-def compute_modularity(graph, use_louvain=False):
+def compute_modularity(graph):
     """
       Compute the modularity of the given graph.
 
       Args:
           graph (NetworkX graph): The graph to compute the modularity of.
-          use_louvain (bool, optional): Whether to use Louvain algorithm for community detection. Default is False.
 
       Returns:
           float: The modularity of the graph.
     """
 
-    column_name = 'louvain_community' if use_louvain else 'community'
-    communities = [set(node for node, attr in graph.nodes(data=True) if attr[column_name] == c)
-                   for c in set(nx.get_node_attributes(graph, column_name).values())]
+    communities = [set(node for node, attr in graph.nodes(data=True) if attr['community'] == c)
+                   for c in set(nx.get_node_attributes(graph, 'community').values())]
 
     # Compute the modularity
     return nx.algorithms.community.modularity(graph, communities)
@@ -128,6 +132,24 @@ def compute_average_edge_degree(graph):
     average_edge_degree = sum(degrees.values()) / total_nodes
 
     return average_edge_degree
+
+
+def compute_stdev_edge_degree(graph):
+    """
+    Compute the standard deviation edge degree of a graph.
+
+    Parameters:
+        graph (networkx.Graph): The input graph.
+
+    Returns:
+        float: The standard deviation edge degree.
+
+    """
+    degrees = dict(graph.degree())
+
+    stdev_edge_degree = statistics.stdev(degrees)
+
+    return stdev_edge_degree
 
 
 def compute_power_law(graph):
@@ -202,14 +224,13 @@ def generate_colors(num_colors):
     return colors
 
 
-def plot(graph, num_comm=0, use_louvain=False):
+def plot(graph, num_comm=0):
     """
     Plot the given graph.
 
     Args:
         graph (NetworkX graph): The graph to plot.
         num_comm (int, optional): The number of communities in the graph. Default is 0.
-        use_louvain (bool, optional): Whether to use Louvain algorithm for community detection. Default is False.
 
     Returns:
         None
@@ -224,7 +245,7 @@ def plot(graph, num_comm=0, use_louvain=False):
             # Assign a color to each node based on its community
             community_colors = {}
             for node, data in graph.nodes(data=True):
-                community_id = data['louvain_community'] if use_louvain else data['community']
+                community_id = data['community']
                 if community_id not in community_colors:
                     community_colors[community_id] = colors.pop(0)
                 node_color = '#' + ''.join(format(c, '02x') for c in community_colors[community_id])
@@ -246,8 +267,8 @@ def plot(graph, num_comm=0, use_louvain=False):
             # Add edges between connected communities
             for edge in graph.edges():
                 node1, node2 = edge
-                community1 = graph.nodes[node1]['louvain_community'] if use_louvain else graph.nodes[node1]['community']
-                community2 = graph.nodes[node2]['louvain_community'] if use_louvain else graph.nodes[node2]['community']
+                community1 = graph.nodes[node1]['community']
+                community2 = graph.nodes[node2]['community']
                 if community1 != community2:
                     g.add_edge(community1, community2)
         else:
@@ -296,7 +317,7 @@ def prompt_node_count():
     Returns:
         int: The total number of nodes entered by the user.
     """
-    return click.prompt('Enter the total number of nodes in the graph', type=int)
+    return click.prompt('Enter the total number of nodes in the graph', type=int, default=1000)
 
 
 def prompt_comm_count():
@@ -1142,7 +1163,7 @@ def get_graph_name(graph_type, graph_params):
     return func(*graph_params)
 
 
-def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, graph_properties,
+def generate_graph_resource_yaml(name, adjacency_list, graph_type, graph_properties,
                                  series_label=None, value_list=None, ):
     """
        Generates a YAML resource definition for a graph with its associated properties and values.
@@ -1151,7 +1172,6 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, g
            name (str): The name of the graph resource.
            adjacency_list (list): The adjacency list representation of the graph.
            graph_type (str): The type of graph.
-           modularity (float): The modularity of the graph.
            graph_properties (list): The properties of the graph.
            series_label (str, optional): The label for serial simulation (default is None).
            value_list (list, optional): The corresponding values for the properties (default is None).
@@ -1177,6 +1197,9 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, g
             value = round(value, 4)
         graph_properties[key] = QuotedString(value)
 
+    # Split the adjacency list by newlines
+    adjacency_list_sections = adjacency_list.split(',')
+
     resource_dict = {
         'apiVersion': 'gossip.io/v1',
         'kind': 'Graph',
@@ -1184,9 +1207,9 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, modularity, g
             'name': name,
         },
         'spec': {
-            'adjacencyList': QuotedString(adjacency_list),
+            'adjacencyList':
+                [QuotedString(f'{section.strip()},') for section in adjacency_list_sections if section.strip()],
             'graphType': QuotedString(graph_type),
-            'modularity': round(modularity, 4),
             'graphProperties': graph_properties
         }
     }
@@ -1246,7 +1269,7 @@ CLICK_COUNT_PROMPT_TEXT = 'Enter the number of graphs that are to be generated.\
                           'with M as the number of different parameters ' \
                           'and N as the number of graphs generated for each set of parameters.\n' \
                           'Enter C/N or C/NxM to select C graphs from the generated graphs ' \
-                          'that have values close to a target metric.'
+                          'that have values close to a target metric'
 
 CLICK_GRAPH_TYPE_HELP_TEXT = f'The graph type (simple, complex, scale-free, barabasi-albert or holme-kim) for the ' \
                              f'created graph '
@@ -1446,89 +1469,164 @@ def generate_graphs(count, graph_type):
                 create_for_N(params)
 
     # visualize in case the user wants to see the graphs
-    visualize = click.confirm('Do you want to see the created graphs?', default=False)
+    # visualize = click.confirm('Do you want to see the created graphs?', default=False)
+    # export to gephi at the end in case the user wants to see the graphs
+    visualize = click.confirm('Do you want to export the created graphs for visualisation?', default=False)
 
-    graph_modularity = {}
-    print(f'Computing graph metrics...')
-    for name, graph in graphs.items():
-        print(f'Computing metrics for graph {name}...')
+    all_keys_before_set = set()
+    for value in graph_properties.values():
+        all_keys_before_set.update(value.keys())
 
-        # compute louvain communities
-        num_communities, partition = apply_louvain(graph)
-        graph_properties[name]['numCommunities'] = num_communities
+    def compute_metrics():
+        print(f'Computing graph metrics...')
+        for name, graph in graphs.items():
+            print(f'Computing metrics for graph {name}...')
 
-        avg_clustering_per_community = nx.clustering(graph, partition)
-        overall_average_clustering = sum(avg_clustering_per_community.values()) / len(avg_clustering_per_community)
-        graph_properties[name]['overallAverageCommunityClustering'] = overall_average_clustering
+            num_edges = len(graph.edges())
+            graph_properties[name]['numEdges'] = num_edges
 
-        # compute actual modularity based on the louvain communities
-        computed_modularity = compute_modularity(graph, use_louvain=True)
-        graph_modularity[name] = computed_modularity
-        # print(f'The graph has a computed modularity of {computed_modularity}.')
+            # compute louvain communities
+            num_communities, partition = apply_louvain(graph)
+            graph_properties[name]['numCommunities'] = num_communities
 
-        computed_avg_degree = compute_average_edge_degree(graph)
-        # print(f'The graph has a computed average degree of {computed_avg_degree}.')
-        graph_properties[name]['averageEdgeDegree'] = computed_avg_degree
+            community_sizes = Counter(partition)
+            average_community_size = sum(community_sizes) / len(community_sizes)
+            graph_properties[name]['averageCommunitySize'] = average_community_size
+            community_size_std = statistics.stdev(community_sizes.values())
+            graph_properties[name]['stdevCommunitySize'] = community_size_std
 
-        # computed_power_law_exp, lower_bound = compute_power_law(graph)
-        # print(f'The graph has a computed power law of {computed_avg_degree} with lower bound {lower_bound}.')
-        # graph_properties[name]['estimatedPowerLawExponent'] = computed_power_law_exp
-        # graph_properties[name]['lowerBoundPowerLawRegion'] = lower_bound
+            avg_clustering_per_community = nx.clustering(graph, partition)
+            overall_average_clustering = sum(avg_clustering_per_community.values()) / len(avg_clustering_per_community)
+            graph_properties[name]['overallAverageCommunityClustering'] = overall_average_clustering
+            overall_stdev_clustering = statistics.stdev(avg_clustering_per_community.values())
+            graph_properties[name]['overallStdevCommunityClustering'] = overall_stdev_clustering
 
-        computed_avg_path_length = compute_average_path_length(graph)
-        # print(f'The graph has a computed avg path length of {computed_avg_path_length}.')
-        graph_properties[name]['averagePathLength'] = computed_avg_path_length
+            # compute actual modularity based on the louvain communities
+            computed_modularity = compute_modularity(graph)
+            graph_properties[name]['modularity'] = computed_modularity
+            # print(f'The graph has a computed modularity of {computed_modularity}.')
 
-        computed_clust_coefficient = compute_cluster_coefficient(graph)
-        # print(f'The graph has a computed cluster coefficient of {computed_clust_coefficient}.')
-        graph_properties[name]['clusterCoefficient'] = computed_clust_coefficient
+            computed_avg_degree = compute_average_edge_degree(graph)
+            # print(f'The graph has a computed average degree of {computed_avg_degree}.')
+            graph_properties[name]['averageEdgeDegree'] = computed_avg_degree
+            computed_stdev_degree = compute_stdev_edge_degree(graph)
+            graph_properties[name]['stdevEdgeDegree'] = computed_stdev_degree
 
-        degree_centrality = nx.degree_centrality(graph)
-        average_degree_centrality = sum(degree_centrality.values()) / len(degree_centrality)
-        graph_properties[name]['averageDegreeCentrality'] = average_degree_centrality
+            # computed_power_law_exp, lower_bound = compute_power_law(graph)
+            # print(f'The graph has a computed power law of {computed_avg_degree} with lower bound {lower_bound}.')
+            # graph_properties[name]['estimatedPowerLawExponent'] = computed_power_law_exp
+            # graph_properties[name]['lowerBoundPowerLawRegion'] = lower_bound
 
-        betweenness_centrality = nx.betweenness_centrality(graph)
-        average_betweenness_centrality = sum(betweenness_centrality.values()) / len(betweenness_centrality)
-        graph_properties[name]['averageBetweennessCentrality'] = average_betweenness_centrality
+            computed_avg_path_length = compute_average_path_length(graph)
+            # print(f'The graph has a computed avg path length of {computed_avg_path_length}.')
+            graph_properties[name]['averagePathLength'] = computed_avg_path_length
 
-        closeness_centrality = nx.closeness_centrality(graph)
-        average_closeness_centrality = sum(closeness_centrality.values()) / len(closeness_centrality)
-        graph_properties[name]['averageClosenessCentrality'] = average_closeness_centrality
+            computed_clust_coefficient = compute_cluster_coefficient(graph)
+            # print(f'The graph has a computed cluster coefficient of {computed_clust_coefficient}.')
+            graph_properties[name]['clusterCoefficient'] = computed_clust_coefficient
 
-        # eigenvector_centrality = nx.eigenvector_centrality(graph)
-        # graph_properties[name]['eigenvectorCentrality'] = eigenvector_centrality
+            degree_centrality = nx.degree_centrality(graph)
+            average_degree_centrality = sum(degree_centrality.values()) / len(degree_centrality)
+            graph_properties[name]['averageDegreeCentrality'] = average_degree_centrality
+            degree_centrality_std = statistics.stdev(degree_centrality.values())
+            graph_properties[name]['stdevDegreeCentrality'] = degree_centrality_std
 
-        assortativity = nx.degree_assortativity_coefficient(graph)
-        graph_properties[name]['assortativity'] = assortativity
+            betweenness_centrality = nx.betweenness_centrality(graph)
+            average_betweenness_centrality = sum(betweenness_centrality.values()) / len(betweenness_centrality)
+            graph_properties[name]['averageBetweennessCentrality'] = average_betweenness_centrality
+            betweenness_centrality_std = statistics.stdev(betweenness_centrality.values())
+            graph_properties[name]['stdevBetweennessCentrality'] = betweenness_centrality_std
 
+            closeness_centrality = nx.closeness_centrality(graph)
+            average_closeness_centrality = sum(closeness_centrality.values()) / len(closeness_centrality)
+            graph_properties[name]['averageClosenessCentrality'] = average_closeness_centrality
+            closeness_centrality_std = statistics.stdev(closeness_centrality.values())
+            graph_properties[name]['stdevClosenessCentrality'] = closeness_centrality_std
 
-        density = nx.density(graph)
-        graph_properties[name]['density'] = density
+            try:
+                eigenvector_centrality = nx.eigenvector_centrality(graph, max_iter=1000)
+                average_eigenvector_centrality = sum(eigenvector_centrality.values()) / len(eigenvector_centrality)
+                graph_properties[name]['averageEigenvectorCentrality'] = average_eigenvector_centrality
+                eigenvector_centrality_std = statistics.stdev(eigenvector_centrality.values())
+                graph_properties[name]['stdevEigenvectorCentrality'] = eigenvector_centrality_std
+            except PowerIterationFailedConvergence:
+                pass
 
-        diameter = nx.diameter(graph)
-        graph_properties[name]['diameter'] = diameter
+            assortativity = nx.degree_assortativity_coefficient(graph)
+            graph_properties[name]['assortativity'] = assortativity
+
+            density = nx.density(graph)
+            graph_properties[name]['density'] = density
+
+            diameter = nx.diameter(graph)
+            graph_properties[name]['diameter'] = diameter
+
+            eccentricity = nx.eccentricity(graph)
+            average_eccentricity = sum(eccentricity.values()) / len(eccentricity)
+            graph_properties[name]['averageEccentricity'] = average_eccentricity
+            eccentricity_std = statistics.stdev(eccentricity.values())
+            graph_properties[name]['stdevEccentricity'] = eccentricity_std
+
+            pagerank = nx.pagerank(graph)
+            average_pagerank = sum(pagerank.values()) / len(pagerank)
+            graph_properties[name]['averagePageRank'] = average_pagerank
+            pagerank_std = statistics.stdev(pagerank.values())
+            graph_properties[name]['stdevPageRank'] = pagerank_std
+
+            hubs, authorities = nx.hits(graph)
+            average_hub_score = sum(hubs.values()) / len(hubs)
+            graph_properties[name]['averageHubScore'] = average_hub_score
+            hub_score_std = statistics.stdev(hubs.values())
+            graph_properties[name]['stdevHubScore'] = hub_score_std
+            average_authority_score = sum(authorities.values()) / len(authorities)
+            graph_properties[name]['averageAuthorityScore'] = average_authority_score
+            authority_score_std = statistics.stdev(authorities.values())
+            graph_properties[name]['stdevAuthorityScore'] = authority_score_std
+
+            average_neighbor_degree = nx.average_neighbor_degree(graph)
+            average_nearest_neighbors_degree = sum(average_neighbor_degree.values()) / len(average_neighbor_degree)
+            graph_properties[name]['averageNearestNeighborsDegree'] = average_nearest_neighbors_degree
+            nearest_neighbors_degree_std = statistics.stdev(average_neighbor_degree.values())
+            graph_properties[name]['stdevNearestNeighborsDegree'] = nearest_neighbors_degree_std
+
+            transitivity = nx.transitivity(graph)
+            graph_properties[name]['transitivity'] = transitivity
+
+            node_connectivity = nx.node_connectivity(graph)
+            graph_properties[name]['nodeConnectivity'] = node_connectivity
+
+            edge_connectivity = nx.edge_connectivity(graph)
+            graph_properties[name]['edgeConnectivity'] = edge_connectivity
+
+            rich_club_coefficient = nx.rich_club_coefficient(graph, normalized=False)
+            average_rich_club_coefficient = sum(rich_club_coefficient.values()) / len(rich_club_coefficient)
+            graph_properties[name]['averageRichClubCoefficient'] = average_rich_club_coefficient
+            rich_club_coefficient_std = statistics.stdev(rich_club_coefficient.values())
+            graph_properties[name]['stdevRichClubCoefficient'] = rich_club_coefficient_std
+
+    compute_metrics()
 
     if selectSubset:
         # Retrieve all the keys from the graph_properties dictionary
-        all_keys = set()
+        all_keys_set = set()
         for value in graph_properties.values():
-            all_keys.update(value.keys())
-        all_keys = list(all_keys)
-        # todo: maybe replace this with a fixed set of graph_properties (select all metrics)
-        # todo: add modularity
+            all_keys_set.update(value.keys())
+        metric_keys_set = all_keys_set - all_keys_before_set
+        metric_keys = list(metric_keys_set)
+        metric_keys.sort()
 
         prompt_text = "Select which metric to approximate.\n"
 
         # Generate the mapping of numbers to key names
-        mapping = "\n".join([f"{i + 1} - {key}" for i, key in enumerate(all_keys)])
+        mapping = "\n".join([f"{i + 1} - {key}" for i, key in enumerate(metric_keys)])
 
         # Append the mapping to the prompt text
-        prompt_text += mapping
+        prompt_text += mapping + "\n"
 
-        choices = [str(num) for num in range(1, len(all_keys) + 1)]
+        choices = [str(num) for num in range(1, len(metric_keys) + 1)]
         # Prompt the user for input
         choice = click.prompt(prompt_text, type=click.Choice(choices))
-        chosen_key = all_keys[int(choice) - 1]
+        chosen_key = metric_keys[int(choice) - 1]
         sorted_graph_properties = dict(sorted(graph_properties.items(), key=lambda x: x[1][chosen_key]))
         sorted_graphs = {name: graphs[name] for name in sorted_graph_properties.keys()}
         sorted_chosen_values = [item[chosen_key] for item in sorted_graph_properties.values()]
@@ -1557,10 +1655,10 @@ def generate_graphs(count, graph_type):
         graphs = closest_graphs_subset
         graph_properties = closest_graph_properties_subset
 
-    for name, graph in graphs.items():
-        # plot the graph and show it
-        if visualize:
-            plot(graph, graph_properties[name]['numCommunities'], use_louvain=True)
+    # for name, graph in graphs.items():
+        # if visualize:
+            # plot the graph and show it
+            # plot(graph, graph_properties[name]['numCommunities'])
 
     choice = click.prompt('Do you want to save the graphs as adjacency lists or create a k8s graph resource?',
                           type=click.Choice(['adj', 'k8s']), default='k8s')
@@ -1576,7 +1674,7 @@ def generate_graphs(count, graph_type):
         value_list = None
         custom = click.confirm('Do you want to set custom node values?', default=False)
         if custom:
-            node_count = max(graph[1].number_of_nodes() for graph in graphs.values())
+            node_count = max(len(graph.nodes) for name, graph in graphs.items())
             while True:
                 value_list_input = click.prompt(f"Enter {node_count} numbers (separated by commas)")
                 value_list = [int(num.strip()) for num in value_list_input.split(",")]
@@ -1623,19 +1721,23 @@ def generate_graphs(count, graph_type):
             adjacency_list_string = ','.join(nx.generate_adjlist(graph))
             graph_props = graph_properties[name]
 
-            modularity = graph_modularity[name]
-
             # generate yaml string
             yaml_string = generate_graph_resource_yaml(name_string,
                                                        adjacency_list_string,
                                                        graph_type_string,
-                                                       modularity,
                                                        graph_props,
                                                        series_label,
                                                        value_list_string,
                                                        )
             # save the graph resource as yaml file
             save_graph_resource_yaml(yaml_string, name_string)
+
+            if visualize:
+                # export in gephi format
+                directory = './generated_gexf/'
+                os.makedirs(directory, exist_ok=True)  # Create the directory if it doesn't exist
+                nx.write_gexf(graph, f"./generated_gexf/{name_string}.gexf")
+
             i += 1
 
 

@@ -30,26 +30,20 @@
 *Prio A
 -----------------------------------------------------------------------------------------------------------------------
 ~Refactor~
-- check rel.work -> add metrics (?)
-- move modularity to graphProperties as well
-- solve metrics resolution in graph_generator (todo)
-- refactor result saving:
- * add csv for all simulations
- * round-based -> useless
- * how to series
- * split graph <-> simulation logging and repeated logging (?)
- * add timestamp to result files (?)
+- stop applications exception (?)
+- ???? exception handling ?????
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
+- implement evaluation application:
+ * merge results into csv
+ * maybe use some kinda database (?)
+
 - maybe use log scale probability values for comm prob alg
-- logging:
- * use logger logic everywhere (?)
- * run highlighting in runner/service (separation line or sth idk)
 -----------------------------------------------------------------------------------------------------------------------
 *Prio C
 -----------------------------------------------------------------------------------------------------------------------
-- refactor visualization logic completely (its shit)
+- refactor visualization logic completely (its shit) ? or remove it ?
 - refactor classes / subclasses (move to separated files) (?)
 - evaluate some real networks
 -----------------------------------------------------------------------------------------------------------------------

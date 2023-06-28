@@ -8,6 +8,7 @@ from concurrent import futures
 import threading
 import json
 import copy
+import logging
 
 sys.path.append("/app/grpc_compiled")
 import gossip_pb2
@@ -49,8 +50,8 @@ class Algorithm:
         """
         self.name = name
         self.neighbors = neighbors
-        print(f"Running algorithm: {self.name}.")
-        print(f"Received neighbors: {self.neighbors}.")
+        logging.info(f"Running algorithm: {self.name}.")
+        logging.info((f"Received neighbors: {self.neighbors}.")
 
     def select_neighbor(self):
         """
@@ -88,8 +89,8 @@ class Memory:
         if neighbor not in self.memory:
             self.weights[neighbor] *= self.prior_partner_factor
             self.memory.add(neighbor)
-            print('DEBUG: weights got changed!!')
-        print(f'DEBUG: weights after gossip {self.weights.values()}')
+            # logging.info('DEBUG: weights got changed!!')
+        # logging.info(f'DEBUG: weights after gossip {self.weights.values()}')
 
 
 class ComplexMemory(Memory):
@@ -118,14 +119,14 @@ class ComplexMemory(Memory):
             neighbor: The neighbor to remember.
         """
         self.weights[neighbor] *= self.prior_partner_factor
-        print(f'DEBUG: weights after gossip {self.weights.values()}')
+        # logging.info(f'DEBUG: weights after gossip {self.weights.values()}')
 
     def forget(self):
         """
         Forget previously remembered neighbors and reset weights.
         """
         self.weights = copy.deepcopy(self.start_weights)
-        print(f'DEBUG: weights after forgetting {self.weights.values()}')
+        # logging.info(f'DEBUG: weights after forgetting {self.weights.values()}')
 
 
 class DefaultMemory(Algorithm, Memory):
@@ -217,7 +218,7 @@ class WeightedFactor(Algorithm):
                 # prioritize non-community neighbors with a given factor
                 weight = self.factor
             self.weights[neighbor] = weight
-        print(f'DEBUG: weights at the start {self.weights.values()}')
+        # logging.info(f'DEBUG: weights at the start {self.weights.values()}')
 
     def select_neighbor(self):
         """
@@ -291,7 +292,7 @@ class CommunityProbabilities(Algorithm):
         self.weights = {}
         for i in range(0, len(self.neighbors)):
             self.weights[neighbors[i]] = inverted_probabilities[i]
-        print(f'DEBUG: weights at the start {self.weights.values()}')
+        # logging.info(f'DEBUG: weights at the start {self.weights.values()}')
 
     def select_neighbor(self):
         """
@@ -371,7 +372,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         # set the value entries and its inivial entry
         self.value_entries = []
         self.value_entries.append(ValueEntry(0, self.value))
-        print(f'GossipService initialized on {self.name} with value {self.value}.')
+        logging.info(f'GossipService initialized on {self.name} with value {self.value}.')
         # Start the listen_for_connections method in a background thread
         self.listen_thread = threading.Thread(target=self.listen_for_connections)
         self.listen_thread.start()
@@ -386,24 +387,26 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         Returns:
             None
         """
-        thread_id = threading.get_ident()
         self.participations += 1
         peer_name, peer_value = data.decode('utf-8').split(':')
-        # print(f"Received peer value: {peer_value} from {peer_name}")
-        print(f"DEBUG {thread_id} - Received peer value: {peer_value} from {peer_name}")
-        print(f"DEBUG {thread_id} - Current value: {self.value}")
+        logging.info(f"Received peer value: {peer_value} from {peer_name}.")
+        # thread_id = threading.get_ident()
+        # logging.info(f"DEBUG {thread_id} - Received peer value: {peer_value} from {peer_name}")
+        # logging.info(f"DEBUG {thread_id} - Current value: {self.value}")
         old_value = self.value
         # set the minimum as the new value
         self.value = min(self.value, int(peer_value))
         if old_value == self.value:
-            print(f"DEBUG {thread_id} - Value was not changed")
+            # logging.info(f"DEBUG {thread_id} - Value was not changed.")
+            logging.info(f"Value was not changed. Current value {self.value}")
         else:
-            print(f"DEBUG {thread_id} - New value after gossiping: {self.value}")
+            # logging.info(f"DEBUG {thread_id} - New value after gossiping: {self.value}.")
+            logging.info(f"Value was changed. New value after gossiping: {self.value}.")
             if isinstance(self.algorithm, ComplexMemory):
                 self.algorithm.forget()
         # log the participation as a value entry
         self.value_entries.append(ValueEntry(self.participations, self.value))
-        # remember the neighbor in case its a memory algorithm
+        # remember the neighbor in case it is a memory algorithm
         if isinstance(self.algorithm, Memory):
             self.algorithm.remember(peer_name)
 
@@ -414,20 +417,20 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         Returns:
             None
         """
-        print('Starting to gossip.')
+        logging.info('Starting to gossip.')
         neighbor = self.algorithm.select_neighbor()
-        print(f'Selecting neighbor {neighbor} to gossip using algorithm {self.algorithm.name}.')
+        logging.info(f'Selecting neighbor {neighbor} to gossip using algorithm {self.algorithm.name}.')
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
                 client_socket.connect((neighbor, TCP_SERVICE_PORT))
                 client_socket.sendall(bytes(f'{self.name}:{self.value}', 'utf-8'))
-                print(f"Sent {self.value} over TCP socket.")
+                logging.info(f"Sent {self.value} over TCP socket.")
                 data = client_socket.recv(TCP_BUFSIZE)
                 # process the received data
                 self.process_gossip_data(data)
         except socket.error as e:
-            print(f"Socket error occurred: {str(e)}")
-        print('Finished gossiping.')
+            logging.error(f"Socket error occurred: {str(e)}")
+        logging.info('Finished gossiping.')
 
     def Reset(self, request, context):
         """
@@ -440,12 +443,13 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         Returns:
             gossip_pb2.ResetResponse: The Reset response.
         """
-        print('[GRPC Reset invoked]')
+        logging.info('[GRPC Reset invoked]')
         self.value = self.original_value
         self.participations = 0
         self.value_entries = []
         self.value_entries.append(ValueEntry(0, self.value))
-        print(f'GossipService reset on {self.name} with original value {self.value}.')
+        logging.info("\n\n")
+        logging.info(f'GossipService reset on {self.name} with original value {self.value}.')
         return gossip_pb2.ResetResponse()
 
     def Gossip(self, request, context):
@@ -459,7 +463,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         Returns:
             gossip_pb2.GossipResponse: The Gossip response.
         """
-        print('[GRPC Gossip invoked]')
+        logging.info('[GRPC Gossip invoked]')
         self.gossip()
         return gossip_pb2.GossipResponse()
 
@@ -474,7 +478,7 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         Returns:
             gossip_pb2.HistoryResponse: The History response.
         """
-        print('[GRPC History invoked]')
+        logging.info('[GRPC History invoked]')
         value_entries = [gossip_pb2.ValueEntry(participations=entry.participations, value=entry.value)
                          for entry in self.value_entries]
         return gossip_pb2.HistoryResponse(value_entries=value_entries)
@@ -490,8 +494,8 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         Returns:
             gossip_pb2.CurrentValueResponse: The CurrentValue response.
         """
-        print('[GRPC CurrentValue invoked]')
-        print(f"Returning value {self.value}.")
+        logging.info('[GRPC CurrentValue invoked]')
+        logging.info(f"Returning value {self.value}.")
         return gossip_pb2.CurrentValueResponse(value=self.value)
 
     def StopApplication(self, request, context):
@@ -505,10 +509,10 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         Returns:
             gossip_pb2.StopApplicationResponse: The StopApplication response.
         """
-        print('[GRPC StopApplication invoked]')
+        logging.info('[GRPC StopApplication invoked]')
         self.stop_listening = True
         self.listen_thread.join()
-        print("Stopped listening.")
+        logging.info("Stopped listening.")
         self._stop_event.set()
         return gossip_pb2.StopApplicationResponse()
 
@@ -527,8 +531,9 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
             data = conn.recv(TCP_BUFSIZE)
             self.process_gossip_data(data)
             conn.sendall(bytes(f'{self.name}:{self.value}', 'utf-8'))
-            thread_id = threading.get_ident()
-            print(f"DEBUG {thread_id} - Responded with value of {self.value} over TCP socket.")
+            logging.info(f"Responded with value of {self.value} over TCP socket.")
+            # thread_id = threading.get_ident()
+            # logging.info(f"DEBUG {thread_id} - Responded with value of {self.value} over TCP socket.")
         finally:
             conn.close()
 
@@ -543,24 +548,25 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
                 server_socket.bind((self.name, TCP_SERVICE_PORT))
                 server_socket.listen(1)
-                print(f'Listening on port {TCP_SERVICE_PORT} for incoming gossip...')
+                logging.info(f'Listening on port {TCP_SERVICE_PORT} for incoming gossip...')
                 while not self.stop_listening:
                     server_socket.settimeout(3)
                     try:
                         conn, addr = server_socket.accept()
-                        print(f'Gossiping request accepted from {addr[0]}:{addr[1]}')
+                        logging.info(f'Gossiping request accepted from {addr[0]}:{addr[1]}')
                         # Handle the connection in a separate thread
                         conn_thread = threading.Thread(target=self.handle_connection, args=(conn,))
                         conn_thread.start()
                     except socket.timeout:
+                        logging.error('Socket Timeout occurred.')
                         continue
         except socket.error as e:
-            print(f"Socket error occurred: {str(e)}")
+            logging.error(f"Socket error occurred: {str(e)}")
 
 
 if __name__ == '__main__':
 
-    print('Gossip node service started.')
+    logging.info('Gossip node service started.')
 
     # get general needed data from environment variables
     name = os.environ.get(ENVIRONMENT_HOSTNAME)
@@ -604,8 +610,8 @@ if __name__ == '__main__':
             factor = float(os.environ.get(ENVIRONMENT_FACTOR))
         except ValueError:
             factor = DEFAULT_FACTOR
-        print(f'Community neighbors set to {community_neighbors}')
-        print(f'Factor set to {factor}')
+        logging.info(f'Community neighbors set to {community_neighbors}')
+        logging.info(f'Factor set to {factor}')
         return community_neighbors, factor
 
 
@@ -619,7 +625,7 @@ if __name__ == '__main__':
         same_community_probabilities_neighbors_str = os.environ.get(ENVIRONMENT_SAME_COMMUNITY_PROBABILITIES_NEIGHBORS)
         same_community_probabilities_neighbors = [float(item) for item in
                                                   same_community_probabilities_neighbors_str.rstrip(',').split(",")]
-        print(f'Same community probabilities set to {same_community_probabilities_neighbors}')
+        logging.info(f'Same community probabilities set to {same_community_probabilities_neighbors}')
         return same_community_probabilities_neighbors
 
 
@@ -634,7 +640,7 @@ if __name__ == '__main__':
             prior_partner_factor = float(os.environ.get(ENVIRONMENT_PRIOR_PARTNER_FACTOR))
         except ValueError:
             prior_partner_factor = DEFAULT_ALGORITHM
-        print(f'Prior partner factor set to {prior_partner_factor}')
+        logging.info(f'Prior partner factor set to {prior_partner_factor}')
         return prior_partner_factor
 
 
@@ -767,13 +773,13 @@ if __name__ == '__main__':
     server.add_insecure_port(f'[::]:{GRPC_SERVICE_PORT}')
     # start the server
     server.start()
-    print(f"Server started on port {GRPC_SERVICE_PORT}")
+    logging.info(f"Server started on port {GRPC_SERVICE_PORT}")
     # Wait for the stop event to be set when stop application grpc call is invoked
     stop_event.wait()
 
     # Application is stopped over grpc
-    print("Stopping server...")
+    logging.info("Stopping server...")
     server.stop(0)
-    print("Server stopped.")
-    print("Stopping application.")
+    logging.info("Server stopped.")
+    logging.info("Stopping application.")
     sys.exit(0)

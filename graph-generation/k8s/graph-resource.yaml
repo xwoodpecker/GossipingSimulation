@@ -16,12 +16,12 @@ spec:
               type: object
               properties:
                 adjacencyList:
-                  type: string
+                  type: array
+                  items:
+                    type: string
                 graphType:
                   type: string
                   default: 'undefined'
-                modularity: 
-                  type: number
                 valueList:
                   type: string
                 graphProperties:
