@@ -1220,7 +1220,7 @@ def generate_graph_resource_yaml(name, adjacency_list, graph_type, graph_propert
         }
 
     if value_list is not None:
-        resource_dict['spec']['valueList'] = f"'{value_list}'"
+        resource_dict['spec']['valueList'] = QuotedString(f'{value_list}')
 
     return yaml.dump(resource_dict, Dumper=CustomDumper, width=float("inf"))
 

@@ -1,12 +1,30 @@
+import logging
 import math
 import time
 import json
 import kopf
+import uuid
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 import networkx as nx
 import community as community_louvain
 from cfg import *
+
+# Create a custom logger
+log = logging.getLogger(__name__)
+
+# Set the logging level
+log.setLevel(logging.INFO)
+
+# Create a formatter with the desired log message format
+formatter = logging.Formatter('%(levelname)s:%(message)s')
+
+# Create a handler and set the formatter
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+
+# Add the handler to the logger
+log.addHandler(handler)
 
 # Load in-cluster configuration
 config.load_incluster_config()
@@ -29,6 +47,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
     Returns:
         None
     """
+    simulation_id = str(uuid.uuid4())
     graph_selector = spec.get('graphSelector', {})
     match_labels = graph_selector.get('matchLabels', {})
 
@@ -40,7 +59,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         graph_name = match_labels['name']
         graph_obj = customs_api.get_namespaced_custom_object('gossip.io', 'v1', namespace, 'graphs', graph_name)
         graph_dict[graph_name] = graph_obj['spec']
-        logger.info(f"Selected graph '{graph_name}' from graphSelector.")
+        log.info(f"Selected graph '{graph_name}' from graphSelector.")
     elif 'series' in match_labels:
         series_simulation = True
         # Select multiple graphs based on 'series' label
@@ -51,15 +70,16 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         for graph_obj in graph_objs['items']:
             graph_name = graph_obj['metadata']['name']
             graph_dict[graph_name] = graph_obj['spec']
-        logger.info(f"Selected graphs in series '{series_name}' from graphSelector.")
+        log.info(f"Selected graphs in series '{series_name}' from graphSelector.")
 
     # Perform simulation for each selected graph spec
     for graph_index, (graph_name, graph_spec) in enumerate(graph_dict.items()):
-        logger.info(f'Creating simulation for graph {graph_name}.')
+        log.info(f'Creating simulation for graph {graph_name}.')
         is_last_graph_spec = (graph_index == len(graph_dict) - 1)
         # Convert the adjacency list from a comma-separated string to a list of tuples
         split_adj_list = graph_spec.get('adjacencyList', '')
-        str_adj_list = '\n'.join(split_adj_list)
+        str_adj_list = ''.join(split_adj_list)
+        split_adj_list = [split_str.rstrip(',') for split_str in split_adj_list]
         adjacency_list = []
         for edge_str in split_adj_list:
             if edge_str:
@@ -87,10 +107,10 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                 neighbors[sub_entry].append(key)
         neighbors = {key: sorted(values) for key, values in sorted(neighbors.items())}
 
-        logger.info(f'Neighbors of each node: {neighbors}')
+        log.info(f'Neighbors of each node: {neighbors}')
 
         algorithm = spec.get('algorithm', DEFAULT_ALGORITHM)
-        logger.info(f'Simulation running algorithm {algorithm}')
+        log.info(f'Simulation running algorithm {algorithm}')
 
         def get_community_node_dict(partition):
             """
@@ -114,7 +134,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                     community_node_dict[community_id] = [node]
                 else:
                     community_node_dict[community_id].append(node)
-            logger.info(f'Node communities: {node_community_dict}')
+            log.info(f'Node communities: {node_community_dict}')
             return node_community_dict, community_node_dict
 
         # communities are needed for weighted_factor and community probability assignment
@@ -195,7 +215,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             Returns:
                 None
             """
-            batch_size = 100
+            batch_size = CREATE_POD_BATCH_SIZE
             num_nodes = len(nodes)
             num_batches = math.ceil(num_nodes / batch_size)
 
@@ -213,6 +233,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                     labels = {
                         'app': 'gossip',
                         'simulation': name,
+                        'simulation_id': simulation_id,
                         'graph': graph_name,
                         'node': str(node)
                     }
@@ -306,13 +327,13 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                     try:
                         # create the pod in the current namespace
                         api.create_namespaced_pod(namespace=namespace, body=pod)
-                        logger.info(f'Pod {pod_name} created.')
+                        log.info(f'Pod {pod_name} created.')
                         pods.append(pod_name)
                     except ApiException as e:
-                        logger.error(f'Error creating pod: {e}')
+                        log.error(f'Error creating pod: {e}')
 
                 # Wait for the pods in this batch to start
-                logger.info(f'Waiting for node pods in batch {batch_index + 1}/{num_batches} to start...')
+                log.info(f'Waiting for node pods in batch {batch_index + 1}/{num_batches} to start...')
                 while True:
                     # List all pods matching the specified labels
                     node_pods = api.list_namespaced_pod(namespace=namespace, label_selector=','.join(
@@ -320,10 +341,10 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
 
                     # Check if all pods in this batch are in the "Running" state
                     if all(pod.status.phase == 'Running' for pod in node_pods.items):
-                        logger.info(f'All node pods in batch {batch_index + 1}/{num_batches} are now running.')
+                        log.info(f'All node pods in batch {batch_index + 1}/{num_batches} are now running.')
                         break
 
-            logger.info(f'Finished creating Pods for simulation {name} on graph {graph_name}.')
+            log.info(f'Finished creating Pods for simulation {name} on graph {graph_name}.')
 
         def create_node_services():
             """
@@ -339,12 +360,14 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                 labels = {
                     'app': 'gossip',
                     'simulation': name,
+                    'simulation_id': simulation_id,
                     'graph': graph_name,
                     'node': str(node)
                 }
                 selector = {
                     'app': 'gossip',
                     'simulation': name,
+                    'simulation_id': simulation_id,
                     'graph': graph_name,
                     'node': str(node)
                 }
@@ -377,11 +400,11 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                 try:
                     # create the service in the current namespace
                     api.create_namespaced_service(namespace=namespace, body=service)
-                    logger.info(f'Service {service_name} created.')
+                    log.info(f'Service {service_name} created.')
                 except ApiException as e:
-                    logger.error(f'Error creating service: {e}')
+                    log.error(f'Error creating service: {e}')
 
-            logger.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
+            log.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
 
         # get simulation settings from the spec
         repetitions = spec.get('repetitions', 1)
@@ -404,6 +427,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             labels = {
                 'app': 'gossip',
                 'simulation': name,
+                'simulation_id': simulation_id,
                 'graph': graph_name,
                 'node': 'runner'
             }
@@ -414,6 +438,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             env = []
             # set all necessary environment variables
             env.append(client.V1EnvVar(name=ENVIRONMENT_SIMULATION, value=name))
+            env.append(client.V1EnvVar(name=ENVIRONMENT_SIMULATION_ID, value=simulation_id))
             env.append(client.V1EnvVar(name=ENVIRONMENT_SERIES_SIMULATION, value=str(series_simulation)))
             env.append(client.V1EnvVar(name=ENVIRONMENT_GRAPH_NAME, value=graph_name))
             env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
@@ -435,7 +460,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             env.append(client.V1EnvVar(name=ENVIRONMENT_SIMULATION_PROPERTIES, value=simulation_properties_string))
             # graph properties for logging
             graph_properties = graphProperties.copy()
-            graph_properties['GraphType'] = graphType
+            graph_properties['graphType'] = graphType
             graph_properties_string = json.dumps(graph_properties)
             env.append(client.V1EnvVar(name=ENVIRONMENT_GRAPH_PROPERTIES, value=graph_properties_string))
 
@@ -473,11 +498,11 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             try:
                 # create the runner pod
                 api.create_namespaced_pod(namespace=namespace, body=pod)
-                logger.info(f'Pod {pod_name} created.')
+                log.info(f'Pod {pod_name} created.')
             except ApiException as e:
-                logger.error(f'Error creating pod: {e}')
+                log.error(f'Error creating pod: {e}')
 
-            logger.info(f'Finished creating simulation runner pod for simulation {name}.')
+            log.info(f'Finished creating simulation runner pod for simulation {name}.')
 
         def create_runner_service():
             """
@@ -492,12 +517,14 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             labels = {
                 'app': 'gossip',
                 'simulation': name,
+                'simulation_id': simulation_id,
                 'graph': graph_name,
                 'node': 'runner'
             }
             selector = {
                 'app': 'gossip',
                 'simulation': name,
+                'simulation_id': simulation_id,
                 'graph': graph_name,
                 'node': 'runner'
             }
@@ -525,11 +552,11 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             try:
                 # create the runner service
                 api.create_namespaced_service(namespace=namespace, body=service)
-                logger.info(f'Service {service_name} created')
+                log.info(f'Service {service_name} created')
             except ApiException as e:
-                logger.error(f'Error creating service: {e}')
+                log.error(f'Error creating service: {e}')
 
-            logger.info(f'Finished creating simulation runner service for simulation {name}.')
+            log.info(f'Finished creating simulation runner service for simulation {name}.')
 
         # create services
         create_node_services()
@@ -541,13 +568,14 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         labels = {
             'app': 'gossip',
             'simulation': name,
+            'simulation_id': simulation_id,
             'graph': graph_name
         }
 
         # wait until all node pods started before the runner pod is started
         # this is done to prevent runner pod restarts
         # restarts can happen because the nodes need to be running for communication purposes
-        logger.info(f'Waiting for node pods to start...')
+        log.info(f'Waiting for node pods to start...')
         while True:
             # List all pods matching the specified labels
             node_pods = api.list_namespaced_pod(namespace=namespace,
@@ -555,7 +583,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
 
             # Check if all pods are in the "Running" state
             if all(pod.status.phase == 'Running' for pod in node_pods.items):
-                logger.info('All node pods are now running.')
+                log.info('All node pods are now running.')
                 # All pods are running, exit the loop
                 break
 
@@ -565,16 +593,16 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         # All pods are running, create the runner pod
         create_runner_pod()
 
-        logger.info(f'Finished creating resources for simulation {name}.')
+        log.info(f'Finished creating resources for simulation {name}.')
 
         # if multiple graphs are to be simulated delete all resources after completion
         if not is_last_graph_spec:
-            logger.info('Waiting for Simulation to complete...')
+            log.info('Waiting for Simulation to complete...')
             while True:
                 try:
                     pods = api.list_namespaced_pod(namespace=namespace, label_selector=f"simulation={name}")
                     if all(pod.status.phase == 'Succeeded' for pod in pods.items):
-                        logger.info(f'Simulation completed for graph {graph_name}.')
+                        log.info(f'Simulation completed for graph {graph_name}.')
                         break
                     else:
                         # Wait for 2 seconds before checking again
@@ -585,13 +613,13 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                         time.sleep(5)
                     else:
                         raise e
-            logger.info('Cleaning up simulation before starting the next.')
-            logger.info('Deleting pods...')
+            log.info('Cleaning up simulation before starting the next.')
+            log.info('Deleting pods...')
             # Delete all pods with the simulation name label
             for pod in pods.items:
                 api.delete_namespaced_pod(pod.metadata.name, namespace)
 
-            logger.info('Deleting services...')
+            log.info('Deleting services...')
             # Delete all services with the simulation name label
             services = api.list_namespaced_service(namespace, label_selector=f"simulation={name}")
             for service in services.items:
@@ -614,12 +642,16 @@ def delete_services_and_pods(body, **kwargs):
     simulation_name = body['metadata']['name']
     namespace = body['metadata']['namespace']
 
+    log.info('Deleting services...')
     # Delete all services with the simulation name label
     services = api.list_namespaced_service(namespace, label_selector=f"simulation={simulation_name}")
     for service in services.items:
         api.delete_namespaced_service(service.metadata.name, namespace)
 
+    log.info('Deleting pods...')
     # Delete all pods with the simulation name label
     pods = api.list_namespaced_pod(namespace, label_selector=f"simulation={simulation_name}")
     for pod in pods.items:
         api.delete_namespaced_pod(pod.metadata.name, namespace)
+
+    log.info(f'Deleted all resources for simulation {simulation_name}.')

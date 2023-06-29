@@ -1,0 +1,17 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: simulation-test-series-weighted-complex-memory
+spec:
+  graphSelector:
+    matchLabels:
+      series: test-series
+  algorithm: weighted_factor_complex_memory
+  visualize: true
+  randomInitialization: false
+  repetitions: 10
+  factor: 1.25
+  priorPartnerFactor: 0.75
+  simulationProperties:
+    test: "42"
+    anotherTest: "123"
