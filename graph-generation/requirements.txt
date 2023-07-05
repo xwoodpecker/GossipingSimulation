@@ -1,0 +1,5 @@
+networkx==3.0
+powerlaw==1.5
+numpy==1.23.5
+python-louvain==0.16
+click==8.1.3
