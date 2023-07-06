@@ -1,0 +1,13 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: series1-weighted-factor
+spec:
+  graphSelector:
+    matchLabels:
+      series: series1
+  algorithm: weighted_factor
+  visualize: false
+  randomInitialization: false
+  repetitions: 20
+  factor: 1.5

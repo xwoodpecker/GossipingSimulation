@@ -2,8 +2,8 @@ apiVersion: gossip.io/v1
 kind: Graph
 metadata:
   labels:
-    series: series1-mod09
-  name: series1_mod09_1
+    series: series1
+  name: series1-mod09-1
 spec:
   adjacencyList:
   - "0 1 2 4 10 13 16 18 19 27 29 41 52 60 70 71 72 104 112 113 120 122 139 149 158 164 194 209 236 259 269 271 272 274 289 347 349 371 375 407 417 442 461 481 523 526 527 536 543 545 578 650 683 752 773 816 861 952 988,"
@@ -1011,7 +1011,6 @@ spec:
     averageAuthorityScore: "0.001"
     averageBetweennessCentrality: "0.0054"
     averageClosenessCentrality: "0.1639"
-    averageCommunitySize: "499.5"
     averageDegreeCentrality: "0.002"
     averageEccentricity: "12.025"
     averageEdgeDegree: "1.998"

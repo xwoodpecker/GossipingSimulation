@@ -11,3 +11,5 @@ docker cp .\ca.crt buildx_buildkit_eager_aryabhata0:/usr/local/share/ca-certific
 
 To remote:
 docker buildx build --platform linux/amd64,linux/arm64 -t gossip-registry:32652/runner-example:sim_v1 --push -f .\Dockerfile.runner .
+
+docker buildx build --builder=eager_aryabhata --platform linux/amd64,linux/arm64 -t gossip-registry:32652/node-example:latest --push -f .\Dockerfile.node .

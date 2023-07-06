@@ -65,10 +65,10 @@ COMMUNITY_PROBABILITIES_ROUNDING = 4
 CREATE_POD_BATCH_SIZE = 50
 REGISTRY_SECRET_NAME = "reg-cred-secret"
 #DOCKER_NODE_IMAGE = "xwoodpecker/node-example:latest"
-DOCKER_NODE_IMAGE = "gossip-registry:32652/node-example:latest"
+DOCKER_NODE_IMAGE = "gossip-registry:32652/node-example:series1"
 DOCKER_NODE_NAME = "node-example"
 #DOCKER_RUNNER_IMAGE = "xwoodpecker/runner-example:latest"
-DOCKER_RUNNER_IMAGE = "gossip-registry:32652/runner-example:latest"
+DOCKER_RUNNER_IMAGE = "gossip-registry:32652/runner-example:series1"
 DOCKER_RUNNER_NAME = "runner-example"
 
 MINIO_CONFIGMAP_NAME = "minio-configmap"

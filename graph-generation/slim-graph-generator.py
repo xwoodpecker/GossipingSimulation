@@ -1236,9 +1236,10 @@ def generate_graphs(count, graph_type):
             num_communities, partition = apply_louvain(graph)
             graph_properties[name]['numCommunities'] = num_communities
 
-            community_sizes = Counter(partition)
-            average_community_size = sum(community_sizes) / len(community_sizes)
+            community_sizes = Counter(partition.values())
+            average_community_size = sum(community_sizes.values()) / len(community_sizes)
             graph_properties[name]['averageCommunitySize'] = average_community_size
+
             community_size_std = statistics.stdev(community_sizes.values())
             graph_properties[name]['stdevCommunitySize'] = community_size_std
 
