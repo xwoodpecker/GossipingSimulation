@@ -29,16 +29,14 @@
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A
 -----------------------------------------------------------------------------------------------------------------------
+- finish evaluation application:
+ * store timestamps, only download new result files
 ~Refactor~
 - stop applications exception (?)
 - add a way to make a test series with varying params (i.e. factor)
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
-- implement evaluation application:
- * merge results into csv
- * maybe use some kinda database (?)
-
 - maybe use log scale probability values for comm prob alg
 -----------------------------------------------------------------------------------------------------------------------
 *Prio C
