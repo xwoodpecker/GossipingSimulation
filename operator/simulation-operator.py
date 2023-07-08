@@ -598,21 +598,31 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         # if multiple graphs are to be simulated delete all resources after completion
         if not is_last_graph_spec:
             log.info('Waiting for Simulation to complete...')
+
+            iteration_count = 0
             while True:
                 try:
                     pods = api.list_namespaced_pod(namespace=namespace, label_selector=f"simulation={name}")
-                    if all(pod.status.phase == 'Succeeded' for pod in pods.items):
+                    completed_count = sum(1 for pod in pods.items if pod.status.phase == 'Succeeded')
+                    total_count = len(pods.items)
+                    if completed_count == total_count:
                         log.info(f'Simulation completed for graph {graph_name}.')
+                        break
+                    elif math.isclose(completed_count / total_count, 0.99, rel_tol=1e-3) and iteration_count >= 10:
+                        log.info(f'99% of the pods have completed for graph {graph_name}.')
+                        log.info(f'One Pod possibly stuck during container stoppage. Proceeding nonetheless...')
                         break
                     else:
                         # Wait for 2 seconds before checking again
                         time.sleep(2)
+                        iteration_count += 1
                 except ApiException as e:
                     if e.status == 404:
                         # Pods not found, simulation may not have started yet
                         time.sleep(5)
                     else:
                         raise e
+
             log.info('Cleaning up simulation before starting the next.')
             log.info('Deleting pods...')
             # Delete all pods with the simulation name label

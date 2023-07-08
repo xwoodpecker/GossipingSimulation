@@ -5,7 +5,9 @@ import warnings
 
 import pandas as pd
 
+from datetime import datetime
 import numpy as np
+import pytz
 from minio import Minio
 from minio.error import S3Error
 from cfg import MINIO_BUCKET_NAME
@@ -74,20 +76,16 @@ def set_evaluated_tag(objects):
         minio_client.set_object_metadata(bucket_name, obj.object_name, obj_metadata)
 
 
-def read_json_files(directory):
+def read_json_files(file_paths):
     data_dict = dict()
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.json') and 'averaged_result' in file:
-                file_path = os.path.join(root, file)
-                file_path = os.path.abspath(file_path)
-                with open(file_path, 'r') as json_file:
-                    try:
-                        data = json.load(json_file)
-                        # Process the JSON data here
-                        data_dict[file_path] = data
-                    except json.JSONDecodeError as e:
-                        print(f"Error decoding JSON file '{file_path}': {e}")
+    for file_path in file_paths:
+        with open(file_path, 'r') as json_file:
+            try:
+                data = json.load(json_file)
+                # Process the JSON data here
+                data_dict[file_path] = data
+            except json.JSONDecodeError as e:
+                print(f"Error decoding JSON file '{file_path}': {e}")
     return data_dict
 
 
@@ -103,8 +101,9 @@ def add_object_storage_path(object_storage_path, data):
     return data
 
 
-def remove_adj_list(data):
+def remove_redundant(data):
     del data['adj_list']
+    data.pop('nodeCommunities', None)
     return data
 
 
@@ -135,27 +134,35 @@ conn = sqlite3.connect('results.db')
 cursor = conn.cursor()
 
 last_import_date = None
+format_string = '%Y-%m-%d %H:%M:%S'
+# Create the table if it doesn't exist
+cursor.execute("CREATE TABLE IF NOT EXISTS LAST_IMPORT_DATE (date TEXT)")
 
 # Insert a single row into the table if it's empty
 cursor.execute("SELECT COUNT(*) FROM LAST_IMPORT_DATE")
 count = cursor.fetchone()[0]
+current_timestamp = datetime.now().strftime(format_string)
 if count == 0:
-    cursor.execute("INSERT INTO LAST_IMPORT_DATE VALUES (datetime('now'))")
+    cursor.execute(f"INSERT INTO LAST_IMPORT_DATE VALUES ('{current_timestamp}')")
 else:
     # Retrieve the current timestamp from the table
     cursor.execute("SELECT date FROM LAST_IMPORT_DATE")
     result = cursor.fetchone()
     if result:
-        last_import_date = result[0]
+        last_import_date = datetime.strptime(result[0], format_string)
+        timezone = pytz.timezone('Europe/Paris')
+        last_import_date = timezone.localize(last_import_date)
+        cursor.execute("UPDATE LAST_IMPORT_DATE SET date = ?", (current_timestamp,))
+
 
 file_dict = download_files_with_name(directory_path, last_import_date)
 # Usage example
-file_data = read_json_files(directory_path)
+file_data = read_json_files(file_dict.keys())
 
 for directory, data in file_data.items():
     modified_data = unwrap_graph_metadata(data)
     modified_data = add_object_storage_path(file_dict[directory], modified_data)
-    modified_data = remove_adj_list(modified_data)
+    modified_data = remove_redundant(modified_data)
     modified_data = rename_num_rounds(modified_data)
     file_data[directory] = modified_data
 
@@ -167,6 +174,8 @@ df = pd.DataFrame(file_data_values)
 # Iterate over the columns
 for column in df.columns:
     try:
+        if isinstance(df[column], dict):
+            pass
         # Try converting the values to float
         df[column] = df[column].astype(float)
     except ValueError:
@@ -195,6 +204,8 @@ if existing_table:
     # Find the missing columns
     missing_columns = set(df.columns) - set(existing_columns)
 
+    additional_columns = set(existing_columns) - set(df.columns)
+
     for column in missing_columns:
         dtype = df[column].dtype
         sql_type = determine_column_type(dtype)
@@ -214,12 +225,9 @@ else:
 
 # Iterate over each row and insert into the table
 for _, row in df.iterrows():
-    insert_query = f"INSERT OR IGNORE INTO {table_name} VALUES ({', '.join(['?'] * len(row))});"
+    column_names = ', '.join(row.index)
+    insert_query = f"INSERT OR IGNORE INTO {table_name} ({column_names}) VALUES ({', '.join(['?'] * len(row))});"
     cursor.execute(insert_query, tuple(row))
-
-# Create the table if it doesn't exist
-cursor.execute('''CREATE TABLE IF NOT EXISTS LAST_IMPORT_DATE
-             (date TEXT)''')
 
 conn.commit()
 # Close the database connection
