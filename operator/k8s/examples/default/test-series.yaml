@@ -9,4 +9,4 @@ spec:
   algorithm: default
   visualize: true
   randomInitialization: false
-  repetitions: 10
+  repetitions: 3

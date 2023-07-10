@@ -36,9 +36,13 @@ spec:
                   type: boolean
                   default: false
                 factor:
-                  type: number
+                  type: array
+                  items:
+                    type: number
                 priorPartnerFactor:
-                  type: number
+                  type: array
+                  items:
+                    type: number
                 simulationProperties:
                   additionalProperties:
                     type: string

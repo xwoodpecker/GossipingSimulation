@@ -110,6 +110,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         log.info(f'Neighbors of each node: {neighbors}')
 
         algorithm = spec.get('algorithm', DEFAULT_ALGORITHM)
+        repetitions = spec.get('repetitions', 1)
         log.info(f'Simulation running algorithm {algorithm}')
 
         def get_community_node_dict(partition):
@@ -147,7 +148,8 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             # weighted factor algorithms use a factor to modify the probability
             # of selecting a partner inside or outside the community
             if algorithm in WEIGHTED_FACTOR_SET:
-                factor = spec.get('factor', DEFAULT_FACTOR)
+                factors = spec.get('factor', [DEFAULT_FACTOR])
+
 
             # community probability algorithms use statistical data for each selection
             # of the next gossip partner
@@ -175,7 +177,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
         # memory algorithms use a factor to modify the probability
         # of selecting a partner that has already been selected in a previous gossiping
         if algorithm in MEMORY_SET:
-            prior_partner_factor = spec.get('priorPartnerFactor', DEFAULT_ALGORITHM)
+            prior_partner_factors = spec.get('priorPartnerFactor', [DEFAULT_PRIOR_PARTNER_FACTOR])
 
         # random initialization sets the node value of each node
         randomInitialization = spec.get('randomInitialization', True)
@@ -244,6 +246,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                     neighbors_str = ','.join([get_resource_name(graph_index, name, n) for n in neighbors[node]])
                     env.append(client.V1EnvVar(name=ENVIRONMENT_NEIGHBORS, value=neighbors_str))
                     env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
+                    env.append(client.V1EnvVar(name=ENVIRONMENT_REPETITIONS, value=str(repetitions)))
                     env.append(client.V1EnvVar(name=ENVIRONMENT_RANDOM_INITIALIZATION, value=str(randomInitialization)))
                     if not randomInitialization:
                         env.append(client.V1EnvVar(name=ENVIRONMENT_NODE_VALUE, value=str(node_values[node])))
@@ -261,9 +264,12 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                             if neighbor_node in community_nodes:
                                 community_neighbors.append(neighbor_node)
 
-                        community_neighbors_str = ','.join([get_resource_name(graph_index, name, n) for n in community_neighbors])
+                        community_neighbors_str = ','.join(
+                            [get_resource_name(graph_index, name, n) for n in community_neighbors]
+                        )
                         env.append(client.V1EnvVar(name=ENVIRONMENT_COMMUNITY_NEIGHBORS, value=community_neighbors_str))
-                        env.append(client.V1EnvVar(name=ENVIRONMENT_FACTOR, value=str(factor)))
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_FACTOR,
+                                                   value=','.join(str(factor) for factor in factors)))
 
                     # community probabilities algorithm specific environment variables
                     if algorithm in COMMUNITY_PROBABILITIES_SET:
@@ -286,7 +292,8 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
 
                     # memory algorithm specific environment variables
                     if algorithm in MEMORY_SET:
-                        env.append(client.V1EnvVar(name=ENVIRONMENT_PRIOR_PARTNER_FACTOR, value=str(prior_partner_factor)))
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_PRIOR_PARTNER_FACTOR,
+                                                   value=','.join(str(factor) for factor in prior_partner_factors)))
 
                     # Create the container for the Pod
                     container = client.V1Container(
@@ -407,11 +414,10 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             log.info(f'Finished creating Services for simulation {name} on graph {graph_name}.')
 
         # get simulation settings from the spec
-        repetitions = spec.get('repetitions', 1)
         visualize = spec.get('visualize', False)
         simulationProperties = spec.get('simulationProperties', {})
         # get graph settings from the graph spec
-        graphType = graph_spec.get('graphType', 'normal')
+        graphType = graph_spec.get('graphType', 'undefined')
         graphProperties = graph_spec.get('graphProperties', {})
 
         def create_runner_pod():
@@ -451,6 +457,14 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             if algorithm in NODE_COMMUNITIES_SET:
                 node_community_string = json.dumps(node_community_dict)
                 env.append(client.V1EnvVar(name=ENVIRONMENT_NODE_COMMUNITIES, value=node_community_string))
+
+                if algorithm in WEIGHTED_FACTOR_SET:
+                    env.append(client.V1EnvVar(name=ENVIRONMENT_FACTOR,
+                                               value=','.join(str(factor) for factor in factors)))
+
+            if algorithm in MEMORY_SET:
+                env.append(client.V1EnvVar(name=ENVIRONMENT_PRIOR_PARTNER_FACTOR,
+                                           value=','.join(str(factor) for factor in prior_partner_factors)))
 
             env.append(client.V1EnvVar(name=ENVIRONMENT_VISUALIZE, value=str(visualize)))
 

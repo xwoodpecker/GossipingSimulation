@@ -5,12 +5,13 @@ metadata:
 spec:
   graphSelector:
     matchLabels:
-      name: my-graph-with-properties
+      name: barab-n20-e1.0
   algorithm: community_probabilities_memory
   repetitions: 1
   visualize: true
   randomInitialization: false
-  priorPartnerFactor: 0.6
+  priorPartnerFactor:
+    - 0.6
   simulationProperties:
     test: "42"
     anotherTest: "123"

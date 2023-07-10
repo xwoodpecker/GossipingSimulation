@@ -5,13 +5,15 @@ metadata:
 spec:
   graphSelector:
     matchLabels:
-      name: my-graph-with-properties
+      name: barab-n20-e1.0
   algorithm: weighted_factor_complex_memory
   repetitions: 4
   visualize: true
   randomInitialization: false
-  factor: 1.25
-  priorPartnerFactor: 0.75
+  factor:
+    - 1.25
+  priorPartnerFactor:
+    - 0.75
   simulationProperties:
     test: "42"
     anotherTest: "123"

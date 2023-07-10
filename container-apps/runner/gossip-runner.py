@@ -1,4 +1,5 @@
 import concurrent
+import itertools
 import os
 import io
 import asyncio
@@ -75,6 +76,16 @@ class AlgorithmData:
 
         self.name = name
         self.properties = simulation_properties
+        self.algorithm_parameters = None
+
+    def set_algorithm_parameters(self, algorithm_parameters):
+        """
+        set algorithm parameters.
+
+        Args:
+            algorithm_parameters (dict): The algorithm parameters.
+        """
+        self.algorithm_parameters = algorithm_parameters
 
 
 class GraphData:
@@ -141,6 +152,9 @@ class Result:
             'algorithm': self.algorithm,
             'adj_list': self.adj_list
         }
+        if algorithm_data.algorithm_parameters is not None and algorithm_data.algorithm_parameters:
+            for param_name, param_value in algorithm_data.algorithm_parameters.items():
+                self.dict[param_name.lower()] = param_value
         if self.graph_metadata is not None and self.graph_metadata:
             self.dict['graph_metadata'] = self.graph_metadata
         if self.simulation_properties is not None and self.simulation_properties:
@@ -237,7 +251,7 @@ class GossipRunner:
     Makes the hosts gossip round by round and stores the simulation results.
     """
 
-    def __init__(self, simulation_name, algorithm_data, repeated, graph_data, minio_access):
+    def __init__(self, simulation_name, algorithm_data, repeated, multiple_params, graph_data, minio_access):
         """
         Initialize the GossipRunner.
 
@@ -245,6 +259,7 @@ class GossipRunner:
             simulation_name (str): The name of the simulation.
             algorithm_data (AlgorithmData): The data of the algorithm used in the simulation.
             repeated (bool): Flag indicating whether the simulation should be repeated.
+            multiple_params (bool): Flag indicating whether the simulation contains multiple param sets.
             graph_data (GraphData): The data of the graph used in the simulation.
             minio_access (MinioAccess): The access credentials for MinIO.
         """
@@ -253,9 +268,13 @@ class GossipRunner:
         self.algorithm = algorithm_data.name
         # set run number and results if repeated execution
         self.repeated = repeated
-        if repeated:
+        self.multiple_params = multiple_params
+        if repeated or multiple_params:
             self.results = []
-            self.run_number = 1
+            if repeated:
+                self.run_number = 1
+            if multiple_params:
+                self.execution_number = 1
         self.graph_data = graph_data
         # shortcut to nodes
         self.nodes = graph_data.nodes
@@ -267,7 +286,7 @@ class GossipRunner:
         self.buffer_dict = {}
         self.minio_access = minio_access
         # init graph plot, generates pgv graph with colors and labels
-        self.init_graph_plot(self.graph_data.num_communities)
+        # self.init_graph_plot(self.graph_data.num_communities)
 
     def init_next_run(self):
         """
@@ -275,6 +294,24 @@ class GossipRunner:
         """
         self.run_number += 1
         self.reset()
+
+    def init_next_execution(self):
+        """
+        Initialize the next execution of the simulation by incrementing the run number and resetting the state.
+        """
+        self.execution_number += 1
+        self.run_number = 1
+        self.reset()
+        self.results = []
+
+    def set_algorithm_parameters(self, algorithm_parameters):
+        """
+        Initialize additional algorithm parameters.
+
+        Args:
+            algorithm_parameters (dict): Dictionary containing key-value-pairs of parameters.
+        """
+        self.algorithm_data.set_algorithm_parameters(algorithm_parameters)
 
     def reset(self):
         """
@@ -461,6 +498,8 @@ class GossipRunner:
             current_date = datetime.datetime.now().strftime(MINIO_TIME_FORMAT_STRING)
 
             self.simulation_path = f'{simulation_name}-{simulation_id}/{graph_name}'
+            if self.multiple_params:
+                self.simulation_path += f'/exec-{self.execution_number}'
             object_path = self.simulation_path
             if self.repeated:
                 object_path += f'/run-{self.run_number}'
@@ -797,6 +836,29 @@ if __name__ == '__main__':
     # get and sort the network nodes for communication
     nodes = os.environ.get(ENVIRONMENT_NODES).rstrip(',').split(",")
 
+    algorithm_params = dict()
+    factors = []
+    if algorithm in WEIGHTED_FACTOR_SET:
+        try:
+            factors = os.environ.get(ENVIRONMENT_FACTOR).rstrip(',').split(",")
+        except (ValueError, AttributeError):
+            factors = [DEFAULT_FACTOR]
+        algorithm_params[ENVIRONMENT_FACTOR] = factors
+
+    prior_partner_factors = []
+    if algorithm in MEMORY_SET:
+        try:
+            prior_partner_factors = os.environ.get(ENVIRONMENT_PRIOR_PARTNER_FACTOR).rstrip(',').split(",")
+        except (ValueError, AttributeError):
+            prior_partner_factors = [DEFAULT_PRIOR_PARTNER_FACTOR]
+        algorithm_params[ENVIRONMENT_PRIOR_PARTNER_FACTOR] = prior_partner_factors
+
+    algorithm_param_keys = list(algorithm_params.keys())
+    algorithm_param_values = list(algorithm_params.values())
+
+    algorithm_param_combinations = [dict(zip(algorithm_param_keys, combo))
+                                    for combo in itertools.product(*algorithm_param_values) if combo]
+
 
     def natural_sort_key(full_name):
         # Extract the numeric part of the name using regular expressions
@@ -822,27 +884,44 @@ if __name__ == '__main__':
         visualize = True
     # initialize graph data
     graphData = GraphData(adj_list, nodes, graph, visualize, graph_properties, node_communities)
-    # initialize the gossip runner
-    runner = GossipRunner(simulation_name, algorithmData, repeated, graphData, minioAccess)
-    # initialize the node value history before running
-    runner.init_node_value_history()
-    # run the simulation until it converges
-    runner.run()
-    # store all simulation results
-    runner.store_results()
 
-    # repeat for additional repetitions
-    for i in range(1, repetitions):
-        sep = '-' * 50
+    no_params = False
+    num_executions = len(algorithm_param_combinations)
+    if num_executions == 0:
+        no_params = True
+        num_executions = 1
+
+    multi_params = False
+    if num_executions > 1:
+        multi_params = True
+
+    # initialize the gossip runner
+    runner = GossipRunner(simulation_name, algorithmData, repeated, multi_params, graphData, minioAccess)
+
+    for i in range(0, num_executions):
+        sep = '*' * 50
         log.info(f"{sep}")
-        log.info(f'Repeated Run #{i + 1} executing...')
-        runner.init_next_run()
-        runner.init_node_value_history()
-        runner.run()
-        runner.store_results()
-    if repeated:
-        # store averaged results (over multiple runs)
-        runner.store_average_results()
+        log.info(f'Execution #{i + 1}/{num_executions} starting...')
+        if not no_params:
+            chosen_params = algorithm_param_combinations[i]
+            log.info(f"Set of params: {chosen_params}")
+            runner.set_algorithm_parameters(chosen_params)
+        # repeat for additional repetitions
+        for j in range(0, repetitions):
+            sep = '-' * 50
+            log.info(f"{sep}")
+            log.info(f'Run #{j + 1}/{repetitions} executing...')
+            runner.init_node_value_history()
+            runner.run()
+            runner.store_results()
+            if j < repetitions - 1:
+                runner.init_next_run()
+        if repeated:
+            # store averaged results (over multiple runs)
+            runner.store_average_results()
+
+        if i < num_executions - 1:
+            runner.init_next_execution()
 
     # stop all nodes over grpc
     runner.stop_node_applications()

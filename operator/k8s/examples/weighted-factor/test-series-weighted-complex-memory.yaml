@@ -9,9 +9,13 @@ spec:
   algorithm: weighted_factor_complex_memory
   visualize: true
   randomInitialization: false
-  repetitions: 10
-  factor: 1.25
-  priorPartnerFactor: 0.75
+  repetitions: 2
+  factor:
+    - 1.25
+    - 1.5
+  priorPartnerFactor:
+    - 0.5
+    - 0.75
   simulationProperties:
     test: "42"
     anotherTest: "123"
