@@ -1,14 +1,12 @@
 apiVersion: gossip.io/v1
 kind: Simulation
 metadata:
-  name: series1-weighted-factor
+  name: gnutella-series-default
 spec:
   graphSelector:
     matchLabels:
-      series: series1
-  algorithm: weighted_factor
+      series: gnutella-series
+  algorithm: default
   visualize: false
   randomInitialization: false
   repetitions: 20
-  factor:
-    - 1.5

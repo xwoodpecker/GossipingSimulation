@@ -148,6 +148,7 @@ class Result:
         self.adj_list = adj_list
         self.graph_metadata = graph_metadata
         self.dict = {
+            'timestamp': self.timestamp,
             'num_rounds': self.num_rounds,
             'algorithm': self.algorithm,
             'adj_list': self.adj_list
@@ -684,14 +685,19 @@ class GossipRunner:
         while True:
             log.info(f"Starting round {round_num} of gossiping...")
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
+
             # Submit the gRPC calls to the executor
-            futures = [executor.submit(self.grpc_gossip, self.stub_dict[node]) for node in self.stub_dict]
+            # futures = [executor.submit(self.grpc_gossip, self.stub_dict[node]) for node in self.stub_dict]
             # Wait for all the calls to finish
-            concurrent.futures.wait(futures)
+            # concurrent.futures.wait(futures)
+
+            # better do it synchronously to avoid non-deterministic behaviour
+            for node in self.stub_dict:
+                self.grpc_gossip(self.stub_dict[node])
+
             # log.info('Debug: all async gossip tasks completed')
             log.info(f"Round {round_num} of gossiping ended. Printing results.")
 
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(self.stub_dict))
             # Submit the gRPC calls to the executor
             futures = [executor.submit(self.grpc_current_value, self.stub_dict[node]) for node in self.stub_dict]
             # Wait for all the calls to finish

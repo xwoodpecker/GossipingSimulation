@@ -143,6 +143,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             graph = nx.parse_adjlist(split_adj_list)
             # apply louvain method on the graph
             partition = community_louvain.best_partition(graph)
+            partition = {int(k): int(v) for k, v in partition.items()}
             node_community_dict, community_node_dict = get_community_node_dict(partition)
 
             # weighted factor algorithms use a factor to modify the probability
@@ -162,7 +163,6 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                     cluster_sizes[cluster] += 1
 
                 # Compute the community_probabilities for each cluster for each node
-                # It represents the certainty of the node belonging to the cluster
                 community_probabilities = {}
                 for node, cluster in partition.items():
                     if node not in community_probabilities:
