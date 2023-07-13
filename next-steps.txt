@@ -7,11 +7,7 @@
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A:
 -----------------------------------------------------------------------------------------------------------------------
-- testplanung
-- ablauf testreihen:
-    -> community gossip y/n simples binäres verfahren erprobren für versch graphtypen
-    -> verfahren entwickeln und optimieren für ausgewählte graphen
-- planung der testreihen an esch für feedback
+Fix wrong stuff:
 - {
     + REFACTOR BARABASI / SCALE  FREE -> SAME BUT FOCUS ON DIFF. ALG.
     + ADD explanation why scale free graphs are the main focus
@@ -24,10 +20,18 @@
  https://en.wikipedia.org/wiki/Modularity_(networks)
  https://www.pnas.org/doi/full/10.1073/pnas.0601602103
  -> instead use: https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.quality.modularity.html
+ check singh !!!
+
+- neu in grundlagen (holme and kim, cluster setup relevant stuff, i.e. runc, contaienrd, cni, flannel)
+- add computation of metrics (quick explanation)
+- compare to singh
+- write cluster setup
+- write implementation (focus on changes made to initial design and how it was extended)
 -----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------BUGFIXING AND REFACTORING:--------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A
+- add popularity generation from "test"
 -----------------------------------------------------------------------------------------------------------------------
 ~Refactor~
 -----------------------------------------------------------------------------------------------------------------------

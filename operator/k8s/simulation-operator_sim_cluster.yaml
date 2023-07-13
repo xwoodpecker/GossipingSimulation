@@ -15,6 +15,6 @@ spec:
       serviceAccountName: simulation-operator-sa
       containers:
         - name: simulation-operator
-          image: gossip-registry:32652/simulation-operator:latest
+          image: gossip-registry:32652/simulation-operator:gnutella-series
       imagePullSecrets:
         - name: reg-cred-secret

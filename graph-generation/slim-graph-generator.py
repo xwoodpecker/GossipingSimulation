@@ -223,7 +223,7 @@ def prompt_comm_count():
     Returns:
         int: The number of communities entered by the user.
     """
-    return click.prompt('Enter the number of communities in the graph', type=int, default=2)
+    return click.prompt('Enter the number of communities in the graph', type=int, default=10)
 
 
 def prompt_p_intra():
@@ -233,7 +233,7 @@ def prompt_p_intra():
     Returns:
         float: The probability of intra-community edges entered by the user.
     """
-    return click.prompt('Enter the probability of intra-community edges (0 to 1)', type=float, default=0.4)
+    return click.prompt('Enter the probability of intra-community edges (0 to 1)', type=float, default=0.1)
 
 
 def prompt_p_inter():
