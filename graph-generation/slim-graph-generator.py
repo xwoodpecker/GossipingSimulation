@@ -4,6 +4,7 @@ import random
 import statistics
 import warnings
 from collections import Counter
+from itertools import combinations, groupby
 
 import click
 import community
@@ -246,7 +247,27 @@ def prompt_p_inter():
     return click.prompt('Enter the probability of inter-community edges (0 to 1)', type=float, default=0.001)
 
 
-def prompt_simple_equal_comms():
+def prompt_num_intra():
+    """
+    Prompt the user to enter the number of intra-community edges.
+
+    Returns:
+        int: The number of intra-community edges entered by the user.
+    """
+    return click.prompt('Enter the number of intra-community edges', type=int, default=1000)
+
+
+def prompt_num_inter():
+    """
+    Prompt the user to enter the number of inter-community edges.
+
+    Returns:
+        int: The number of inter-community edges entered by the user.
+    """
+    return click.prompt('Enter the number of of inter-community edges', type=int, default=250)
+
+
+def prompt_equal_comms():
     """
     Prompt the user to choose whether the communities should be of equal size.
 
@@ -256,9 +277,9 @@ def prompt_simple_equal_comms():
     return click.confirm('Should the communities be of equal size?', default=True)
 
 
-def get_params_simple_graph():
+def get_params_simple_popularity_graph():
     """
-    Prompt the user to enter parameters for generating a simple graph.
+    Prompt the user to enter parameters for generating a simple popularity graph.
 
     Returns:
         tuple: A tuple containing the entered values for node count, community count, intra-community edge probability,
@@ -266,15 +287,43 @@ def get_params_simple_graph():
     """
     node_count = prompt_node_count()
     comm_count = prompt_comm_count()
-    equal_sized = prompt_simple_equal_comms()
+    equal_sized = prompt_equal_comms()
     p_intra = prompt_p_intra()
     p_inter = prompt_p_inter()
     return node_count, comm_count, p_intra, p_inter, equal_sized
 
 
-def get_graph_properties_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized):
+def get_params_fixed_popularity_graph():
     """
-    Get the graph properties based on the provided parameters for generating a simple graph.
+    Prompt the user to enter parameters for generating a fixed popularity graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count, community count, intra-community edge count,
+               inter-community edge count.
+    """
+    node_count = prompt_node_count()
+    comm_count = prompt_comm_count()
+    # equal_sized = prompt_equal_comms()
+    while True:
+        num_intra = prompt_num_intra()
+        num_inter = prompt_num_inter()
+        limit_intra = node_count - comm_count
+        limit_inter = math.ceil(comm_count / 2)
+        if num_intra > limit_intra:
+            break
+        else:
+            print(f'Need at least {limit_intra} intra-community edges.')
+        if num_inter > limit_inter:
+            break
+        else:
+            print(f'Need at least {limit_inter} inter-community edges.')
+
+    return node_count, comm_count, num_intra, num_inter
+
+
+def get_graph_properties_simple_popularity_graph(node_count, comm_count, p_intra, p_inter, equal_sized):
+    """
+    Get the graph properties based on the provided parameters for generating a simple popularity  graph.
 
     Args:
         node_count (int): The total number of nodes in the graph.
@@ -295,9 +344,31 @@ def get_graph_properties_simple_graph(node_count, comm_count, p_intra, p_inter, 
     }
 
 
-def get_end_params_simple_graph():
+def get_graph_properties_fixed_popularity_graph(node_count, comm_count, num_intra, num_inter):
     """
-    Prompt the user to enter the end parameters for generating a simple graph.
+    Get the graph properties based on the provided parameters for generating a simple popularity  graph.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        comm_count (int): The number of communities in the graph.
+        num_intra (int): The number of intra-community edges.
+        num_inter (int): The number of inter-community edges.
+
+    Returns:
+        dict: A dictionary containing the graph properties.
+    """
+    return {
+        'nodeCount': node_count,
+        'communityCount': comm_count,
+        'numIntraCommunityEdges': num_intra,
+        'numInterCommunityEdges': num_inter,
+        # 'equalSizedCommunities': equal_sized
+    }
+
+
+def get_end_params_simple_popularity_graph():
+    """
+    Prompt the user to enter the end parameters for generating a simple popularity  graph.
 
     Returns:
         tuple: A tuple containing the entered values for node count, community count, intra-community edge probability,
@@ -308,6 +379,33 @@ def get_end_params_simple_graph():
     p_intra = prompt_p_intra()
     p_inter = prompt_p_inter()
     return node_count, comm_count, p_intra, p_inter
+
+
+def get_end_params_fixed_popularity_graph():
+    """
+    Prompt the user to enter the end parameters for generating a fixed popularity  graph.
+
+    Returns:
+        tuple: A tuple containing the entered values for node count, community count, intra-community edge count,
+               and inter-community edge count.
+    """
+    node_count = prompt_node_count()
+    comm_count = prompt_comm_count()
+    while True:
+        num_intra = prompt_num_intra()
+        num_inter = prompt_num_inter()
+        limit_intra = node_count - comm_count
+        limit_inter = math.ceil(comm_count / 2)
+        if num_intra < limit_intra:
+            break
+        else:
+            print(f'Need at least {limit_intra} intra-community edges.')
+        if num_inter < limit_inter:
+            break
+        else:
+            print(f'Need at least {limit_inter} inter-community edges.')
+
+    return node_count, comm_count, num_intra, num_inter
 
 
 def prompt_degree():
@@ -548,7 +646,8 @@ def get_get_params_func(graph_type):
     """
 
     get_params_funcs = {
-        GRAPH_TYPE_SIMPLE_SHORT: get_params_simple_graph,
+        GRAPH_TYPE_SIMPLE_POPULARITY_SHORT: get_params_simple_popularity_graph,
+        GRAPH_TYPE_FIXED_POPULARITY_SHORT: get_params_fixed_popularity_graph,
         GRAPH_TYPE_SCALE_FREE_SHORT: get_params_scale_free_graph,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_params_barabasi_albert_graph,
         GRAPH_TYPE_HOLME_KIM_SHORT: get_params_holme_kim_graph,
@@ -568,7 +667,8 @@ def get_get_graph_properties_func(graph_type):
         function: The get_graph_properties function for the specified graph type.
     """
     get_graph_properties_funcs = {
-        GRAPH_TYPE_SIMPLE_SHORT: get_graph_properties_simple_graph,
+        GRAPH_TYPE_SIMPLE_POPULARITY_SHORT: get_graph_properties_simple_popularity_graph,
+        GRAPH_TYPE_FIXED_POPULARITY_SHORT: get_graph_properties_fixed_popularity_graph,
         GRAPH_TYPE_SCALE_FREE_SHORT: get_graph_properties_scale_free_graph,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_graph_properties_barabasi_albert_graph,
         GRAPH_TYPE_HOLME_KIM_SHORT: get_graph_properties_holme_kim_graph,
@@ -588,7 +688,8 @@ def get_get_end_params_func(graph_type):
         function: The get_end_params function for the specified graph type.
     """
     get_end_params_funcs = {
-        GRAPH_TYPE_SIMPLE_SHORT: get_end_params_simple_graph,
+        GRAPH_TYPE_SIMPLE_POPULARITY_SHORT: get_end_params_simple_popularity_graph,
+        GRAPH_TYPE_FIXED_POPULARITY_SHORT: get_params_fixed_popularity_graph,
         GRAPH_TYPE_SCALE_FREE_SHORT: get_params_scale_free_graph,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_params_barabasi_albert_graph,
         GRAPH_TYPE_HOLME_KIM_SHORT: get_params_holme_kim_graph,
@@ -597,9 +698,9 @@ def get_get_end_params_func(graph_type):
     return func
 
 
-def get_simple_graph_name(node_count, comm_count, p_intra, p_inter, equal_sized):
+def get_simple_popularity_graph_name(node_count, comm_count, p_intra, p_inter, equal_sized):
     """
-    Generate a name for a simple graph based on the provided parameters.
+    Generate a name for asimple popularity  graph based on the provided parameters.
 
     Args:
         node_count (int): The total number of nodes in the graph.
@@ -614,12 +715,28 @@ def get_simple_graph_name(node_count, comm_count, p_intra, p_inter, equal_sized)
     p_intra = np.round(p_intra, decimals=4)
     p_inter = np.round(p_inter, decimals=4)
     eq_str = 'eq' if equal_sized else 'ne'
-    return f'{GRAPH_TYPE_SIMPLE_SHORT}-n{node_count}-c{comm_count}-{eq_str}-p1-{p_intra}-p2-{p_inter}'
+    return f'{GRAPH_TYPE_SIMPLE_POPULARITY_SHORT}-n{node_count}-c{comm_count}-{eq_str}-p1-{p_intra}-p2-{p_inter}'
 
 
-def generate_simple_graph(node_count, comm_count, p_intra, p_inter, equal_sized):
+def get_fixed_popularity_graph_name(node_count, comm_count, num_intra, num_inter):
     """
-    Generate a modular graph with the specified parameters.
+    Generate a name for asimple popularity  graph based on the provided parameters.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        comm_count (int): The number of communities in the graph.
+        num_intra (int): The number of an intra-community edge.
+        num_inter (int): The number of an inter-community edge.
+
+    Returns:
+        str: The generated graph name.
+    """
+    return f'{GRAPH_TYPE_FIXED_POPULARITY_SHORT}-n{node_count}-c{comm_count}-n1-{num_intra}-n2-{num_inter}'
+
+
+def generate_simple_popularity_graph(node_count, comm_count, p_intra, p_inter, equal_sized):
+    """
+    Generate a simple popularity graph with the specified parameters.
 
     Args:
         node_count (int): The total number of nodes in the graph.
@@ -720,6 +837,130 @@ def add_random_inter_community_edge(graph, i, j):
     node_j = random.choice(nodes_j)
     graph.add_edge(node_i, node_j)
     return graph
+
+
+def generate_fixed_popularity_graph(node_count, comm_count, num_intra, num_inter):
+    """
+    Generate a fixed popularity graph with the specified parameters.
+
+    Args:
+        node_count (int): The total number of nodes in the graph.
+        comm_count (int): The number of communities in the graph.
+        num_intra (int): The number of intra-community edges.
+        num_inter (int): The number of inter-community edges.
+
+    Returns:
+        A NetworkX graph representing the generated modular graph.
+    """
+    # Create an empty graph
+    graph = nx.Graph()
+
+    # Generate a list of community sizes
+    sizes = [node_count // comm_count] * comm_count
+    sizes[0] += node_count % comm_count
+
+    factor = num_intra / node_count
+    num_intra_arr = [math.ceil(size * factor) for size in sizes]
+
+    # Generate a random modular graph
+    for i in range(comm_count):
+        nodes = list(range(sum(sizes[:i]), sum(sizes[:i + 1])))
+        size = sizes[i]
+        subgraph = nx.Graph()
+        subgraph.add_nodes_from(nodes)
+        node_range = range(nodes[0], nodes[size - 1] + 1)
+
+        dim = 2
+        edges = combinations(node_range, dim)
+
+        num_edges = 0
+        for _, node_edges in groupby(edges, key=lambda x: x[0]):
+            node_edges = list(node_edges)
+            random_edge = random.choice(node_edges)
+            subgraph.add_edge(*random_edge)
+            num_edges += 1
+
+        def random_combination(iterable, r):
+            pool = tuple(iterable)
+            n = len(pool)
+            indices = sorted(random.sample(range(n), r))
+            return tuple(pool[i] for i in indices)
+
+        tries = 0
+        while num_edges < num_intra_arr[i] and tries < 1000:
+            random_edge = random_combination(node_range, dim)
+            if random_edge not in subgraph.edges:
+                subgraph.add_edge(*random_edge)
+                num_edges += 1
+                tries = 0
+            else:
+                tries += 1
+
+        graph.add_nodes_from(subgraph.nodes())
+        graph.add_edges_from(subgraph.edges())
+
+    # Set the community dictionary
+    community_dict = {}
+    for i in range(comm_count):
+        nodes = list(range(sum(sizes[:i]), sum(sizes[:i + 1])))
+        for node in nodes:
+            community_dict[node] = i
+
+    # Set the community attribute for each node in the graph
+    nx.set_node_attributes(graph, community_dict, 'desired_community')
+
+    if comm_count > 1:
+        # Generate random numbers for each pair of tuples
+        pair_numbers = [random.randint(0, num_inter) for _ in range(comm_count * (comm_count - 1) // 2)]
+        total_numbers = sum(pair_numbers)
+
+        # Normalize the numbers to ensure the sum is equal to num_inter
+        normalized_numbers = [int(num * num_inter / total_numbers) for num in pair_numbers]
+        remaining = num_inter - sum(normalized_numbers)
+
+        # Distribute the remaining difference to the first few pairs
+        for i in range(remaining):
+            normalized_numbers[i] += 1
+    else:
+        normalized_numbers = [num_inter]
+
+    index = 0
+    # Add additional edges between communities based on the assigned numbers
+    for i in range(comm_count):
+        for j in range(i + 1, comm_count):
+            num_edges = normalized_numbers[index]
+            index += 1
+            add_fixed_inter_community_edges(graph, i, j, num_edges)
+
+    # Make sure that the whole graph is interconnected
+    interconnected_graph = make_fully_interconnected(graph)
+
+    return interconnected_graph
+
+
+def add_fixed_inter_community_edges(graph, comm1, comm2, num_edges):
+    """
+    Add a specified number of inter-community edges between two communities.
+
+    Args:
+        graph (NetworkX graph): The graph to add edges to.
+        comm1 (int): Community 1 index.
+        comm2 (int): Community 2 index.
+        num_edges (int): The number of edges to add between the communities.
+    """
+    nodes1 = [node for node, attr in graph.nodes(data=True) if attr['desired_community'] == comm1]
+    nodes2 = [node for node, attr in graph.nodes(data=True) if attr['desired_community'] == comm2]
+    edges = []
+
+    while len(edges) < num_edges:
+        node1 = random.choice(nodes1)
+        node2 = random.choice(nodes2)
+        edge = (node1, node2)
+
+        if edge not in edges and not graph.has_edge(*edge):
+            edges.append(edge)
+
+    graph.add_edges_from(edges)
 
 
 def get_scale_free_graph_name(node_count, alpha, beta, gamma, edge_multi):
@@ -883,7 +1124,8 @@ def get_creation_func(graph_type):
            func (function): The graph creation function corresponding to the graph type.
     """
     create_graph_funcs = {
-        GRAPH_TYPE_SIMPLE_SHORT: generate_simple_graph,
+        GRAPH_TYPE_SIMPLE_POPULARITY_SHORT: generate_simple_popularity_graph,
+        GRAPH_TYPE_FIXED_POPULARITY_SHORT: generate_fixed_popularity_graph,
         GRAPH_TYPE_SCALE_FREE_SHORT: generate_scale_free_graph,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: generate_barabasi_albert_graph,
         GRAPH_TYPE_HOLME_KIM_SHORT: generate_holme_kim_graph,
@@ -904,7 +1146,8 @@ def get_graph_name(graph_type, graph_params):
            func (function): The function that generates the name of the graph based on its type and parameters.
     """
     get_graph_name_funcs = {
-        GRAPH_TYPE_SIMPLE_SHORT: get_simple_graph_name,
+        GRAPH_TYPE_SIMPLE_POPULARITY_SHORT: get_simple_popularity_graph_name,
+        GRAPH_TYPE_FIXED_POPULARITY_SHORT: get_fixed_popularity_graph_name,
         GRAPH_TYPE_SCALE_FREE_SHORT: get_scale_free_graph_name,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: get_barabasi_albert_graph_name,
         GRAPH_TYPE_HOLME_KIM_SHORT: get_holme_kim_graph_name,
@@ -1001,7 +1244,8 @@ def get_graph_type_long(graph_type):
             str: The long version of the graph type.
     """
     long_graph_types = {
-        GRAPH_TYPE_SIMPLE_SHORT: GRAPH_TYPE_SIMPLE,
+        GRAPH_TYPE_SIMPLE_POPULARITY_SHORT: GRAPH_TYPE_SIMPLE_POPULARITY,
+        GRAPH_TYPE_FIXED_POPULARITY_SHORT: GRAPH_TYPE_FIXED_POPULARITY,
         GRAPH_TYPE_SCALE_FREE_SHORT: GRAPH_TYPE_SCALE_FREE,
         GRAPH_TYPE_BARABASI_ALBERT_SHORT: GRAPH_TYPE_BARABASI_ALBERT,
         GRAPH_TYPE_HOLME_KIM_SHORT: GRAPH_TYPE_HOLME_KIM,
@@ -1020,12 +1264,13 @@ CLICK_COUNT_PROMPT_TEXT = 'Enter the number of graphs that are to be generated.\
                           'Enter C/N or C/NxM to select C graphs from the generated graphs ' \
                           'that have values close to a target metric'
 
-CLICK_GRAPH_TYPE_HELP_TEXT = f'The graph type (simple, scale-free, barabasi-albert or holme-kim) for the ' \
-                             f'created graph '
+CLICK_GRAPH_TYPE_HELP_TEXT = f'The graph type (simple popularity, fixed popularity, scale-free,' \
+                             f' barabasi-albert or holme-kim) for the created graph '
 
 CLICK_GRAPH_TYPE_PROMPT_TEXT = 'Choose graph type:\n' \
-                               f'* [{GRAPH_TYPE_SIMPLE_SHORT}] : Simple modular graph creation ' \
+                               f'* [{GRAPH_TYPE_SIMPLE_POPULARITY_SHORT}] : simple popularity graph creation ' \
                                'based on inter/intra-edge generation\n' \
+                               f'* [{GRAPH_TYPE_FIXED_POPULARITY_SHORT}] : fixed popularity graph creation\n' \
                                f'* [{GRAPH_TYPE_SCALE_FREE_SHORT}] : Scale-free graph creation\n' \
                                f'* [{GRAPH_TYPE_BARABASI_ALBERT_SHORT}] : Barabási-Albert graph creation\n' \
                                f'* [{GRAPH_TYPE_HOLME_KIM_SHORT}] : Holme-Kim powerlaw cluster graph creation\n'
@@ -1037,8 +1282,10 @@ CLICK_GRAPH_TYPE_PROMPT_TEXT = 'Choose graph type:\n' \
               help=CLICK_COUNT_HELP_TEXT,
               prompt=CLICK_COUNT_PROMPT_TEXT)
 @click.option('--graph-type',
-              type=click.Choice([f'{GRAPH_TYPE_SIMPLE_SHORT}',
-                                 f'{GRAPH_TYPE_SCALE_FREE_SHORT}', f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}',
+              type=click.Choice([f'{GRAPH_TYPE_SIMPLE_POPULARITY_SHORT}',
+                                 f'{GRAPH_TYPE_FIXED_POPULARITY_SHORT}',
+                                 f'{GRAPH_TYPE_SCALE_FREE_SHORT}',
+                                 f'{GRAPH_TYPE_BARABASI_ALBERT_SHORT}',
                                  f'{GRAPH_TYPE_HOLME_KIM_SHORT}']),
               help=CLICK_GRAPH_TYPE_HELP_TEXT,
               prompt=CLICK_GRAPH_TYPE_PROMPT_TEXT)
