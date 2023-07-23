@@ -20,7 +20,14 @@ minio_access_key = "admin"
 minio_secret_key = "S4Pek7B8gn"
 
 bucket_name = MINIO_BUCKET_NAME
-name_contains = 'averaged_result'
+name_contains_averaged = '_averaged_result'
+name_contains_summary = '_summary'
+
+table_name_averaged_results = 'AVERAGED_RESULTS'
+table_name_summaries = 'SUMMARIES'
+
+last_import_date_averaged_results_table_name = 'LAST_IMPORT_DATE_AVERAGED_RESULTS'
+last_import_date_summaries_table_name = 'LAST_IMPORT_DATE_SUMMARIES'
 
 # MinIO connection settings
 minio_client = Minio(
@@ -31,7 +38,7 @@ minio_client = Minio(
 )
 
 
-def download_files_with_name(path, created_after=None):
+def download_files_with_name(name_contains, path, created_after=None):
     files = dict()
     try:
         # Retrieve list of objects in the bucket
@@ -58,22 +65,6 @@ def download_files_with_name(path, created_after=None):
         print(f"MinIO Error: {err}")
 
     return files
-
-
-def set_evaluated_tag(objects):
-    # Iterate over each object
-    for obj in objects:
-        # Get the object's metadata
-        obj_metadata = minio_client.stat_object(bucket_name, obj.object_name)
-
-        # Add or update the "evaluated" tag in the metadata
-        if 'metadata' not in obj_metadata:
-            obj_metadata['metadata'] = {}
-
-        obj_metadata['metadata']['evaluated'] = 'true'
-
-        # Set the updated metadata for the object
-        minio_client.set_object_metadata(bucket_name, obj.object_name, obj_metadata)
 
 
 def read_json_files(file_paths):
@@ -133,101 +124,124 @@ os.makedirs(directory_path, exist_ok=True)
 conn = sqlite3.connect('results.db')
 cursor = conn.cursor()
 
-last_import_date = None
-format_string = '%Y-%m-%d %H:%M:%S'
-# Create the table if it doesn't exist
-cursor.execute("CREATE TABLE IF NOT EXISTS LAST_IMPORT_DATE (date TEXT)")
 
-# Insert a single row into the table if it's empty
-cursor.execute("SELECT COUNT(*) FROM LAST_IMPORT_DATE")
-count = cursor.fetchone()[0]
-current_timestamp = datetime.now().strftime(format_string)
-if count == 0:
-    cursor.execute(f"INSERT INTO LAST_IMPORT_DATE VALUES ('{current_timestamp}')")
-else:
-    # Retrieve the current timestamp from the table
-    cursor.execute("SELECT date FROM LAST_IMPORT_DATE")
-    result = cursor.fetchone()
-    if result:
-        last_import_date = datetime.strptime(result[0], format_string)
-        timezone = pytz.timezone('Europe/Paris')
-        last_import_date = timezone.localize(last_import_date)
-        cursor.execute("UPDATE LAST_IMPORT_DATE SET date = ?", (current_timestamp,))
+def update_last_import_date(last_import_table_name):
+    last_import_date = None
+    format_string = '%Y-%m-%d %H:%M:%S'
+    # Create the table if it doesn't exist
+    cursor.execute(f"CREATE TABLE IF NOT EXISTS {last_import_table_name} (date TEXT)")
+
+    # Insert a single row into the table if it's empty
+    cursor.execute(f"SELECT COUNT(*) FROM {last_import_table_name}")
+    count = cursor.fetchone()[0]
+    current_timestamp = datetime.now().strftime(format_string)
+    if count == 0:
+        cursor.execute(f"INSERT INTO {last_import_table_name} VALUES ('{current_timestamp}')")
+    else:
+        # Retrieve the current timestamp from the table
+        cursor.execute(f"SELECT date FROM {last_import_table_name}")
+        result = cursor.fetchone()
+        if result:
+            last_import_date = datetime.strptime(result[0], format_string)
+            timezone = pytz.timezone('Europe/Paris')
+            last_import_date = timezone.localize(last_import_date)
+            cursor.execute("UPDATE LAST_IMPORT_DATE_AVERAGED SET date = ?", (current_timestamp,))
+
+    return last_import_date
 
 
-file_dict = download_files_with_name(directory_path, last_import_date)
-# Usage example
-file_data = read_json_files(file_dict.keys())
+last_import_date_averaged_results = update_last_import_date(last_import_date_averaged_results_table_name)
+last_import_date_summaries = update_last_import_date(last_import_date_summaries_table_name)
 
-for directory, data in file_data.items():
-    modified_data = unwrap_graph_metadata(data)
-    modified_data = add_object_storage_path(file_dict[directory], modified_data)
-    modified_data = remove_redundant(modified_data)
-    modified_data = rename_num_rounds(modified_data)
-    file_data[directory] = modified_data
+file_dict_averaged_results = download_files_with_name(name_contains_averaged,
+                                                      directory_path,
+                                                      last_import_date_averaged_results
+                                                      )
+file_dict_summaries = download_files_with_name(name_contains_summary,
+                                               directory_path,
+                                               last_import_date_summaries)
 
-file_data_values = list(file_data.values())
 
-# Convert the data into a pandas DataFrame
-df = pd.DataFrame(file_data_values)
+def read_df_from_file_dict(file_dict):
+    # Usage example
+    file_data = read_json_files(file_dict.keys())
 
-# Iterate over the columns
-for column in df.columns:
-    try:
-        if isinstance(df[column], dict):
-            pass
-        # Try converting the values to float
-        df[column] = df[column].astype(float)
-    except ValueError:
-        # If conversion throws an exception, change the data type to string/text
-        df[column] = df[column].astype(str)
+    for directory, data in file_data.items():
+        modified_data = unwrap_graph_metadata(data)
+        modified_data = add_object_storage_path(file_dict[directory], modified_data)
+        modified_data = remove_redundant(modified_data)
+        modified_data = rename_num_rounds(modified_data)
+        file_data[directory] = modified_data
 
-# Get the unique keys from the dictionaries
-keys = set(df.columns)
+    file_data_values = list(file_data.values())
+
+    # Convert the data into a pandas DataFrame
+    df = pd.DataFrame(file_data_values)
+
+    # Iterate over the columns
+    for column in df.columns:
+        try:
+            if isinstance(df[column], dict):
+                pass
+            # Try converting the values to float
+            df[column] = df[column].astype(float)
+        except ValueError:
+            # If conversion throws an exception, change the data type to string/text
+            df[column] = df[column].astype(str)
+
+    return df
+
+
+df_averaged_results = read_df_from_file_dict(file_dict_averaged_results)
+df_averaged_summaries = read_df_from_file_dict(file_dict_summaries)
+
 
 # Save the DataFrame to the database
-table_name = 'AVERAGED_RESULTS'
-
-# Extract column names and types from the Pandas DataFrame
-column_names = ','.join(df.columns)
-column_types = ','.join([df[col].dtype.name for col in df.columns])
-
-# Check if the table already exists
-cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
-existing_table = cursor.fetchone()
-
-if existing_table:
-    # Get the existing column names from the table
-    cursor.execute(f"PRAGMA table_info({table_name})")
-    existing_columns = [column[1] for column in cursor.fetchall()]
-
-    # Find the missing columns
-    missing_columns = set(df.columns) - set(existing_columns)
-
-    additional_columns = set(existing_columns) - set(df.columns)
-
-    for column in missing_columns:
-        dtype = df[column].dtype
-        sql_type = determine_column_type(dtype)
-        alter_table_query = f"ALTER TABLE {table_name} ADD COLUMN {column} {sql_type}"
-        cursor.execute(alter_table_query)
-else:
+def insert_df_into_db_table(df, table_name):
     # Extract column names and types from the Pandas DataFrame
-    columns = []
-    for column_name, dtype in df.dtypes.items():
-        sql_type = determine_column_type(dtype)
-        columns.append(f"{column_name} {sql_type}")
+    column_names = ','.join(df.columns)
+    column_types = ','.join([df[col].dtype.name for col in df.columns])
 
-    # Create the table with appropriate column names and types
-    create_table_query = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(columns)}, " \
-                         f"CONSTRAINT unique_objectStoragePath UNIQUE (ObjectStoragePath))"
-    cursor.execute(create_table_query)
+    # Check if the table already exists
+    cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+    existing_table = cursor.fetchone()
 
-# Iterate over each row and insert into the table
-for _, row in df.iterrows():
-    column_names = ', '.join(row.index)
-    insert_query = f"INSERT OR IGNORE INTO {table_name} ({column_names}) VALUES ({', '.join(['?'] * len(row))});"
-    cursor.execute(insert_query, tuple(row))
+    if existing_table:
+        # Get the existing column names from the table
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        existing_columns = [column[1] for column in cursor.fetchall()]
+
+        # Find the missing columns
+        missing_columns = set(df.columns) - set(existing_columns)
+
+        additional_columns = set(existing_columns) - set(df.columns)
+
+        for column in missing_columns:
+            dtype = df[column].dtype
+            sql_type = determine_column_type(dtype)
+            alter_table_query = f"ALTER TABLE {table_name} ADD COLUMN {column} {sql_type}"
+            cursor.execute(alter_table_query)
+    else:
+        # Extract column names and types from the Pandas DataFrame
+        columns = []
+        for column_name, dtype in df.dtypes.items():
+            sql_type = determine_column_type(dtype)
+            columns.append(f"{column_name} {sql_type}")
+
+        # Create the table with appropriate column names and types
+        create_table_query = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(columns)}, " \
+                             f"CONSTRAINT unique_objectStoragePath UNIQUE (ObjectStoragePath))"
+        cursor.execute(create_table_query)
+
+    # Iterate over each row and insert into the table
+    for _, row in df.iterrows():
+        column_names = ', '.join(row.index)
+        insert_query = f"INSERT OR IGNORE INTO {table_name} ({column_names}) VALUES ({', '.join(['?'] * len(row))});"
+        cursor.execute(insert_query, tuple(row))
+
+
+insert_df_into_db_table(df_averaged_results, table_name_averaged_results)
+insert_df_into_db_table(df_averaged_summaries, table_name_summaries)
 
 conn.commit()
 # Close the database connection

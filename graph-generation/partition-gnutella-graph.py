@@ -78,7 +78,7 @@ def compute_modularity(graph):
     return nx.algorithms.community.modularity(graph, communities)
 
 
-def compute_average_edge_degree(graph):
+def compute_average_node_degree(graph):
     """
     Compute the average edge degree of a graph.
 
@@ -92,12 +92,12 @@ def compute_average_edge_degree(graph):
     degrees = dict(graph.degree())
     total_nodes = graph.number_of_nodes()
 
-    average_edge_degree = sum(degrees.values()) / total_nodes
+    average_node_degree = sum(degrees.values()) / total_nodes
 
-    return average_edge_degree
+    return average_node_degree
 
 
-def compute_stdev_edge_degree(graph):
+def compute_stdev_node_degree(graph):
     """
     Compute the standard deviation edge degree of a graph.
 
@@ -110,9 +110,9 @@ def compute_stdev_edge_degree(graph):
     """
     degrees = dict(graph.degree())
 
-    stdev_edge_degree = statistics.stdev(degrees)
+    stdev_node_degree = statistics.stdev(degrees)
 
-    return stdev_edge_degree
+    return stdev_node_degree
 
 
 def compute_power_law(graph):
@@ -352,11 +352,11 @@ def compute_metrics():
         graph_properties[name]['modularity'] = computed_modularity
         # print(f'The graph has a computed modularity of {computed_modularity}.')
 
-        computed_avg_degree = compute_average_edge_degree(graph)
+        computed_avg_degree = compute_average_node_degree(graph)
         # print(f'The graph has a computed average degree of {computed_avg_degree}.')
-        graph_properties[name]['averageEdgeDegree'] = computed_avg_degree
-        computed_stdev_degree = compute_stdev_edge_degree(graph)
-        graph_properties[name]['stdevEdgeDegree'] = computed_stdev_degree
+        graph_properties[name]['averagenodeDegree'] = computed_avg_degree
+        computed_stdev_degree = compute_stdev_node_degree(graph)
+        graph_properties[name]['stdevnodeDegree'] = computed_stdev_degree
 
         computed_power_law_exp, lower_bound = compute_power_law(graph)
         # print(f'The graph has a computed power law of {computed_power_law_exp} with lower bound {lower_bound}.')
@@ -430,10 +430,10 @@ def compute_metrics():
         graph_properties[name]['stdevAuthorityScore'] = authority_score_std
 
         average_neighbor_degree = nx.average_neighbor_degree(graph)
-        average_nearest_neighbors_degree = sum(average_neighbor_degree.values()) / len(average_neighbor_degree)
-        graph_properties[name]['averageNearestNeighborsDegree'] = average_nearest_neighbors_degree
+        average_neighbors_degree = sum(average_neighbor_degree.values()) / len(average_neighbor_degree)
+        graph_properties[name]['averageNeighborsDegree'] = average_neighbors_degree
         nearest_neighbors_degree_std = statistics.stdev(average_neighbor_degree.values())
-        graph_properties[name]['stdevNearestNeighborsDegree'] = nearest_neighbors_degree_std
+        graph_properties[name]['stdevNeighborsDegree'] = nearest_neighbors_degree_std
 
         transitivity = nx.transitivity(graph)
         graph_properties[name]['transitivity'] = transitivity

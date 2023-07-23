@@ -221,7 +221,6 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             num_nodes = len(nodes)
             num_batches = math.ceil(num_nodes / batch_size)
 
-            # Create a dictionary to store the Pod names and their node number
             # Create a Pod for each node in the graph
             for batch_index in range(num_batches):
                 start_index = batch_index * batch_size

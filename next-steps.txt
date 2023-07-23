@@ -2,36 +2,33 @@
 -------------------------------------------------(NEW)DEVELOPMENT:-----------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 - make a jupyternotebook for evaluating the dataset after each test series
+- simulationsreihen:
+  * scale free modularity
+  * scale free power law
+  * popularity intra/inter %
+  * gnutella
+  * more fine-grained mod (0.7-0.95)
+  * test all for different factors (select best type for each)
+  * refine algorithm
 -----------------------------------------------------------------------------------------------------------------------
 --------------------------------------------------DOCUMENTATION:-------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A:
 -----------------------------------------------------------------------------------------------------------------------
 Fix wrong stuff:
-- {
-    + REFACTOR BARABASI / SCALE  FREE -> SAME BUT FOCUS ON DIFF. ALG.
-    + ADD explanation why scale free graphs are the main focus
-    +  maybe add/replace different graph types (?) -> argument why random graphs are not useful
-    + how to generate with fixed modularity (?)
-  }
-- barabasi albert -> "kantengrad" powerlaw misunderstanding
--> differentiation edge degree (3/13)
-- modularity defintion (Wtf?)
- https://en.wikipedia.org/wiki/Modularity_(networks)
- https://www.pnas.org/doi/full/10.1073/pnas.0601602103
- -> instead use: https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.community.quality.modularity.html
- check singh !!!
-
-- neu in grundlagen (holme and kim, cluster setup relevant stuff, i.e. runc, contaienrd, cni, flannel)
-- add computation of metrics (quick explanation)
-- compare to singh
-- write cluster setup
+- "kantengrad" powerlaw misunderstanding
+-> differentiation edge degree (3/13) (for related work ?)
+- add result reader logic to read ALL (not only averaged)  results -> more data points
+- write analysis prototypes -> add some of the changes made
 - write implementation (focus on changes made to initial design and how it was extended)
+
+- add test series definition (konzeption)
+- add explanation why which graphs were selected for the test series
+- add minikube somewhere ? (test environment)
+- related work (esch papers on graph generation)
 -----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------BUGFIXING AND REFACTORING:--------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
-*Prio A
-- add popularity generation from "test"
 -----------------------------------------------------------------------------------------------------------------------
 ~Refactor~
 -----------------------------------------------------------------------------------------------------------------------

@@ -9,6 +9,13 @@ spec:
   algorithm: weighted_factor
   visualize: false
   randomInitialization: false
-  repetitions: 20
+  repetitions: 10
   factor:
+    - 1.25
     - 1.5
+    - 1.75
+    - 2
+    - 2.25
+    - 2.5
+    - 2.75
+    - 3

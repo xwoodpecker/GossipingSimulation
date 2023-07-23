@@ -912,12 +912,13 @@ if __name__ == '__main__':
             chosen_params = algorithm_param_combinations[i]
             log.info(f"Set of params: {chosen_params}")
             runner.set_algorithm_parameters(chosen_params)
-        # repeat for additional repetitions
+        # repeat for the number of repetitions
         for j in range(0, repetitions):
             sep = '-' * 50
             log.info(f"{sep}")
             log.info(f'Run #{j + 1}/{repetitions} executing...')
             runner.init_node_value_history()
+            # run the gossip simulation
             runner.run()
             runner.store_results()
             if j < repetitions - 1:

@@ -28,7 +28,7 @@
 
 * barabasi alebrt 
     node_count (int): The number of nodes in the graph.
-    edge_degree (int): The number of edges to attach from a new node to existing nodes.
+    node_degree (int): The number of edges to attach from a new node to existing nodes.
 
 ---------------------------------------------------------------
 * holme and kim powerlaw cluster graph

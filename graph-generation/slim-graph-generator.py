@@ -13,6 +13,7 @@ import networkx as nx
 import numpy as np
 import yaml
 from networkx import PowerIterationFailedConvergence
+from networkx.utils import py_random_state
 
 from cfg import *
 
@@ -100,9 +101,9 @@ def compute_modularity(graph):
     return nx.algorithms.community.modularity(graph, communities)
 
 
-def compute_average_edge_degree(graph):
+def compute_average_node_degree(graph):
     """
-    Compute the average edge degree of a graph.
+    Compute the average node degree of a graph.
 
     Parameters:
         graph (networkx.Graph): The input graph.
@@ -114,12 +115,12 @@ def compute_average_edge_degree(graph):
     degrees = dict(graph.degree())
     total_nodes = graph.number_of_nodes()
 
-    average_edge_degree = sum(degrees.values()) / total_nodes
+    average_node_degree = sum(degrees.values()) / total_nodes
 
-    return average_edge_degree
+    return average_node_degree
 
 
-def compute_stdev_edge_degree(graph):
+def compute_stdev_node_degree(graph):
     """
     Compute the standard deviation edge degree of a graph.
 
@@ -132,9 +133,9 @@ def compute_stdev_edge_degree(graph):
     """
     degrees = dict(graph.degree())
 
-    stdev_edge_degree = statistics.stdev(degrees)
+    stdev_node_degree = statistics.stdev(degrees)
 
-    return stdev_edge_degree
+    return stdev_node_degree
 
 
 def compute_power_law(graph):
@@ -308,14 +309,12 @@ def get_params_fixed_popularity_graph():
         num_intra = prompt_num_intra()
         num_inter = prompt_num_inter()
         limit_intra = node_count - comm_count
-        limit_inter = math.ceil(comm_count / 2)
-        if num_intra > limit_intra:
+        limit_inter = comm_count - 1
+        if num_intra >= limit_intra and num_inter >= limit_inter:
             break
-        else:
+        elif num_intra < limit_intra:
             print(f'Need at least {limit_intra} intra-community edges.')
-        if num_inter > limit_inter:
-            break
-        else:
+        elif num_inter < limit_inter:
             print(f'Need at least {limit_inter} inter-community edges.')
 
     return node_count, comm_count, num_intra, num_inter
@@ -550,16 +549,6 @@ def prompt_new_edges():
     return click.prompt('Enter the number of edges to attach from each newly added node', type=float, default=2.0)
 
 
-def prompt_new_edges_as_int():
-    """
-    Prompt the user to enter the number of new edges to add for each node in the graph.
-
-    Returns:
-        int: The entered number of new edges
-    """
-    return click.prompt('Enter the number of edges to attach from each newly added node', type=int, default=2)
-
-
 def prompt_triangle_probability():
     """
     Prompt the user to enter the probability of adding a triangle after adding a random edge.
@@ -593,7 +582,7 @@ def get_params_holme_kim_graph():
     """
 
     node_count = prompt_node_count()
-    new_edges = prompt_new_edges_as_int()
+    new_edges = prompt_new_edges()
     triangle_probability = prompt_triangle_probability()
     return node_count, new_edges, triangle_probability
 
@@ -621,7 +610,7 @@ def get_graph_properties_holme_kim_graph(node_count, new_edges, triangle_probabi
 
     Args:
         node_count (int): The total number of nodes in the graph.
-        new_edges (int): The number of new edges for each node in the graph.
+        new_edges (float): The number of new edges for each node in the graph.
         triangle_probability (float): Probability of adding a triangle after adding a random edge
 
     Returns:
@@ -634,7 +623,7 @@ def get_graph_properties_holme_kim_graph(node_count, new_edges, triangle_probabi
     }
 
 
-def get_get_params_func(graph_type):
+def get_params_func(graph_type):
     """
     Get the corresponding get_params function based on the graph type.
 
@@ -656,7 +645,7 @@ def get_get_params_func(graph_type):
     return func
 
 
-def get_get_graph_properties_func(graph_type):
+def get_graph_properties_func(graph_type):
     """
     Get the corresponding get_graph_properties function based on the graph type.
 
@@ -677,7 +666,7 @@ def get_get_graph_properties_func(graph_type):
     return func
 
 
-def get_get_end_params_func(graph_type):
+def get_end_params_func(graph_type):
     """
     Get the corresponding get_end_params function based on the graph type.
 
@@ -700,7 +689,7 @@ def get_get_end_params_func(graph_type):
 
 def get_simple_popularity_graph_name(node_count, comm_count, p_intra, p_inter, equal_sized):
     """
-    Generate a name for asimple popularity  graph based on the provided parameters.
+    Generate a name for a simple popularity  graph based on the provided parameters.
 
     Args:
         node_count (int): The total number of nodes in the graph.
@@ -858,6 +847,18 @@ def generate_fixed_popularity_graph(node_count, comm_count, num_intra, num_inter
     # Generate a list of community sizes
     sizes = [node_count // comm_count] * comm_count
     sizes[0] += node_count % comm_count
+
+    min_num_intra = sum(sizes) - comm_count
+    if num_intra < min_num_intra:
+        num_intra = max(num_intra, min_num_intra)
+        print(f'The value of num_intra had to be changed to {num_intra} '
+              f'so that the given community nodes are interconnected.')
+
+    min_num_inter = comm_count - 1
+    if num_inter < min_num_inter:
+        num_inter = max(num_inter, min_num_inter)
+        print(f'The value of num_inter had to be changed to {num_inter} '
+              f'so that the given communities are connected.')
 
     factor = num_intra / node_count
     num_intra_arr = [math.ceil(size * factor) for size in sizes]
@@ -1048,12 +1049,13 @@ def get_holme_kim_graph_name(node_count, new_edges, triangle_probability):
 
     Args:
         node_count (int): The total number of nodes in the graph.
-        new_edges (int): The degree of each new node added during the graph construction.
+        new_edges (float): The degree of each new node added during the graph construction.
         triangle_probability (float):  Probability of adding a triangle after adding a random edge.
 
     Returns:
         str: The generated graph name.
     """
+    new_edges = np.round(new_edges, decimals=4)
     triangle_probability = np.round(triangle_probability, decimals=4)
     return f'{GRAPH_TYPE_HOLME_KIM_SHORT}-n{node_count}-e{new_edges}-t{triangle_probability}'
 
@@ -1087,9 +1089,9 @@ def generate_barabasi_albert_graph(node_count, new_edges):
            A Barabasi-Albert graph of `node_count` nodes and `new_edges` node attachments.
    """
 
-    m1 = int(new_edges)  # Assign the integer part of edge_degree to m1
+    m1 = int(new_edges)  # Assign the integer part of node_degree to m1
     m2 = m1 + 1  # Assign m1 + 1 to m2
-    p = 1 - (new_edges - int(new_edges))
+    p = 1 - (new_edges - m1)
 
     graph = nx.dual_barabasi_albert_graph(node_count, m1, m2, p)
     return graph
@@ -1103,14 +1105,109 @@ def generate_holme_kim_graph(node_count, new_edges, triangle_probability):
 
        Args:
            node_count (int): The number of nodes in the graph.
-           new_edges (int): The number of edges to attach from a new node to existing nodes.
+           new_edges (float): The number of edges to attach from a new node to existing nodes.
            triangle_probability (float):  Probability of adding a triangle after adding a random edge.
 
        Returns:
            A Holme and Kim Powerlaw Cluster Graph.
    """
-    graph = nx.powerlaw_cluster_graph(node_count, new_edges, triangle_probability)
+    graph = custom_powerlaw_cluster_graph(node_count, new_edges, triangle_probability)
     return graph
+
+
+@py_random_state(3)
+def custom_powerlaw_cluster_graph(n, m, p, seed=None):
+    """Custom Holme and Kim algorithm for growing graphs with powerlaw
+    degree distribution and approximate average clustering.
+    Changed from default: "m" is now a float
+
+    Parameters
+    ----------
+    n : int
+        the number of nodes
+    m : float
+        the number of random edges to add for each new node (is a float now)
+    p : float,
+        Probability of adding a triangle after adding a random edge
+    seed : integer, random_state, or None (default)
+        Indicator of random number generation state.
+        See :ref:`Randomness<randomness>`.
+
+    Notes
+    -----
+    (The notes and references remain unchanged)
+
+    """
+
+    if m < 1 or n < m:
+        raise nx.NetworkXError(f"NetworkXError must have m>1 and m<n, m={m},n={n}")
+
+    if p > 1 or p < 0:
+        raise nx.NetworkXError(f"NetworkXError p must be in [0,1], p={p}")
+
+    m1 = int(m)
+    m2 = m1 + 1
+    p_float = 1 - (m - m1)
+
+    def choose_m():
+        # Pick which m to use (m1 or m2)
+        if seed.random() < p_float:
+            return m1
+        else:
+            return m2
+
+    # Pick which m to use (m1 or m2)
+    m = choose_m()
+    G = nx.empty_graph(m)  # add int(m) initial nodes
+    repeated_nodes = list(G.nodes())  # list of existing nodes to sample from
+    source = m  # next node is m
+    while source < n:  # Now add the other n-1 nodes
+        possible_targets = _random_subset(repeated_nodes, m, seed)
+        # do one preferential attachment for the new node
+        target = possible_targets.pop()
+        G.add_edge(source, target)
+        repeated_nodes.append(target)  # add one node to the list for each new link
+        count = 1
+        while count < m:  # add int(m)-1 more new links
+            if seed.random() < p:  # clustering step: add a triangle
+                neighborhood = [
+                    nbr
+                    for nbr in G.neighbors(target)
+                    if not G.has_edge(source, nbr) and not nbr == source
+                ]
+                if neighborhood:  # if there is a neighbor without a link
+                    nbr = seed.choice(neighborhood)
+                    G.add_edge(source, nbr)  # add triangle
+                    repeated_nodes.append(nbr)
+                    count += 1
+                    continue  # go to the top of the while loop
+            # else do preferential attachment step if the above fails
+            target = possible_targets.pop()
+            G.add_edge(source, target)
+            repeated_nodes.append(target)
+            count += 1
+
+        repeated_nodes.extend([source] * m)  # add the source node to the list int(m) times
+        source += 1
+        # Pick which m to use (m1 or m2)
+        m = choose_m()
+    return G
+
+
+# Helper function
+def _random_subset(seq, m, seed):
+    """ Return m unique elements from seq.
+
+    This differs from random.sample which can return repeated
+    elements if seq holds repeated elements.
+
+    Note: Method derived from the NetworkX library.
+    """
+    targets = set()
+    while len(targets) < m:
+        x = seed.choice(seq)
+        targets.add(x)
+    return targets
 
 
 def get_creation_func(graph_type):
@@ -1343,9 +1440,9 @@ def generate_graphs(count, graph_type):
                     type=str, default="5x10")
 
     # set the functions for the chosen graph type
-    get_params_func = get_get_params_func(graph_type)
-    get_graph_properties_func = get_get_graph_properties_func(graph_type)
-    get_end_params_func = get_get_end_params_func(graph_type)
+    params_func = get_params_func(graph_type)
+    graph_properties_func = get_graph_properties_func(graph_type)
+    end_params_func = get_end_params_func(graph_type)
     create_graph_func = get_creation_func(graph_type)
 
     graph_properties = {}
@@ -1367,11 +1464,11 @@ def generate_graphs(count, graph_type):
                 count = name_counts[name]
                 name_counts[name] += 1
                 name = f'{name}_{count}'
-            graph_properties[name] = get_graph_properties_func(*params)
+            graph_properties[name] = graph_properties_func(*params)
             graphs[name] = graph
 
     # get the graph parameters from user input
-    graph_params = get_params_func()
+    graph_params = params_func()
 
     # in case of MxN graph creation
     if sameParams is True:
@@ -1386,14 +1483,14 @@ def generate_graphs(count, graph_type):
             create_for_N(graph_params)
             # ask each set of params one by one
             for _ in range(0, M - 1):
-                graph_params = get_params_func()
+                graph_params = params_func()
                 create_for_N(graph_params)
         else:
             interpolate = click.confirm('Do you want to interpolate the parameters? Otherwise they will be randomly '
                                         'generated.', default=True)
             print('Specify end parameters of the last set of graphs (end of the interval).')
             # ask for the last set of params
-            end_params = get_end_params_func()
+            end_params = end_params_func()
 
             # interpolate the remaining parameters
 
@@ -1490,10 +1587,10 @@ def generate_graphs(count, graph_type):
             community_size_std = statistics.stdev(community_sizes.values())
             graph_properties[name]['stdevCommunitySize'] = community_size_std
 
-            avg_clustering_per_community = nx.clustering(graph, partition)
-            overall_average_clustering = sum(avg_clustering_per_community.values()) / len(avg_clustering_per_community)
+            clustering_per_node = nx.clustering(graph, partition)
+            overall_average_clustering = sum(clustering_per_node.values()) / len(clustering_per_node)
             graph_properties[name]['overallAverageCommunityClustering'] = overall_average_clustering
-            overall_stdev_clustering = statistics.stdev(avg_clustering_per_community.values())
+            overall_stdev_clustering = statistics.stdev(clustering_per_node.values())
             graph_properties[name]['overallStdevCommunityClustering'] = overall_stdev_clustering
 
             # compute actual modularity based on the louvain communities
@@ -1501,11 +1598,11 @@ def generate_graphs(count, graph_type):
             graph_properties[name]['modularity'] = computed_modularity
             # print(f'The graph has a computed modularity of {computed_modularity}.')
 
-            computed_avg_degree = compute_average_edge_degree(graph)
+            computed_avg_degree = compute_average_node_degree(graph)
             # print(f'The graph has a computed average degree of {computed_avg_degree}.')
-            graph_properties[name]['averageEdgeDegree'] = computed_avg_degree
-            computed_stdev_degree = compute_stdev_edge_degree(graph)
-            graph_properties[name]['stdevEdgeDegree'] = computed_stdev_degree
+            graph_properties[name]['averageNodeDegree'] = computed_avg_degree
+            computed_stdev_degree = compute_stdev_node_degree(graph)
+            graph_properties[name]['stdevNodeDegree'] = computed_stdev_degree
 
             computed_power_law_exp, lower_bound = compute_power_law(graph)
             # print(f'The graph has a computed power law of {computed_power_law_exp} with lower bound {lower_bound}.')
@@ -1515,10 +1612,6 @@ def generate_graphs(count, graph_type):
             computed_avg_path_length = compute_average_path_length(graph)
             # print(f'The graph has a computed avg path length of {computed_avg_path_length}.')
             graph_properties[name]['averagePathLength'] = computed_avg_path_length
-
-            computed_clust_coefficient = compute_cluster_coefficient(graph)
-            # print(f'The graph has a computed cluster coefficient of {computed_clust_coefficient}.')
-            graph_properties[name]['clusterCoefficient'] = computed_clust_coefficient
 
             degree_centrality = nx.degree_centrality(graph)
             average_degree_centrality = sum(degree_centrality.values()) / len(degree_centrality)
@@ -1579,10 +1672,10 @@ def generate_graphs(count, graph_type):
             graph_properties[name]['stdevAuthorityScore'] = authority_score_std
 
             average_neighbor_degree = nx.average_neighbor_degree(graph)
-            average_nearest_neighbors_degree = sum(average_neighbor_degree.values()) / len(average_neighbor_degree)
-            graph_properties[name]['averageNearestNeighborsDegree'] = average_nearest_neighbors_degree
+            average_neighbors_degree = sum(average_neighbor_degree.values()) / len(average_neighbor_degree)
+            graph_properties[name]['averageNeighborsDegree'] = average_neighbors_degree
             nearest_neighbors_degree_std = statistics.stdev(average_neighbor_degree.values())
-            graph_properties[name]['stdevNearestNeighborsDegree'] = nearest_neighbors_degree_std
+            graph_properties[name]['stdevNeighborsDegree'] = nearest_neighbors_degree_std
 
             transitivity = nx.transitivity(graph)
             graph_properties[name]['transitivity'] = transitivity
