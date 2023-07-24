@@ -1,0 +1,12 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: series3-default
+spec:
+  graphSelector:
+    matchLabels:
+      series: series3
+  algorithm: default
+  visualize: false
+  randomInitialization: false
+  repetitions: 10

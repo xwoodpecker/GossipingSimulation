@@ -1,43 +1,42 @@
------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------(NEW)DEVELOPMENT:-----------------------------------------------------
------------------------------------------------------------------------------------------------------------------------
-- make a jupyternotebook for evaluating the dataset after each test series
-- simulationsreihen:
-  * scale free modularity
-  * scale free power law
-  * popularity intra/inter %
-  * gnutella
-  * more fine-grained mod (0.7-0.95)
-  * test all for different factors (select best type for each)
-  * refine algorithm
------------------------------------------------------------------------------------------------------------------------
 --------------------------------------------------DOCUMENTATION:-------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A:
 -----------------------------------------------------------------------------------------------------------------------
-Fix wrong stuff:
+- 1.2 aufbau
+- zusammenfassung (abstract)
+- related work (esch papers on graph generation)
+
 - "kantengrad" powerlaw misunderstanding
 -> differentiation edge degree (3/13) (for related work ?)
-- add result reader logic to read ALL (not only averaged)  results -> more data points
-- write analysis prototypes -> add some of the changes made
-- write implementation (focus on changes made to initial design and how it was extended)
 
-- add test series definition (konzeption)
-- add explanation why which graphs were selected for the test series
-- add minikube somewhere ? (test environment)
-- related work (esch papers on graph generation)
+- proof-reading + korrektur + überarbeitung
 -----------------------------------------------------------------------------------------------------------------------
--------------------------------------------BUGFIXING AND REFACTORING:--------------------------------------------------
+*Prio B:
+-----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------
+*Prio C:
+-----------------------------------------------------------------------------------------------------------------------
+- add test series definition (konzeption)
+  add explanation why which graphs were selected for the test series
+- update rel work (italians)
+- appendix
+-----------------------------------------------------------------------------------------------------------------------
+-------------------------------------------DEVELOPING AND REFACTORING:-------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 ~Refactor~
 -----------------------------------------------------------------------------------------------------------------------
+*Prio A
+-----------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
+- define new test series for finding the optimal algorithm (select graphs)
+- create first jupyternotebooks
 - maybe use log scale probability values for comm prob alg
+- develop top grade new algorithm "ULTIMATE GOSSIPING" (what did the italians do?)
 -----------------------------------------------------------------------------------------------------------------------
 *Prio C
 -----------------------------------------------------------------------------------------------------------------------
-- logic that fail-saves application errors (operator stuck in waiting)
 -----------------------------------------------------------------------------------------------------------------------
 

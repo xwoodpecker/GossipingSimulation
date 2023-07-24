@@ -1463,7 +1463,7 @@ def generate_graphs(count, graph_type):
                 # Duplicate name found
                 count = name_counts[name]
                 name_counts[name] += 1
-                name = f'{name}_{count}'
+                name = f'{name}-{count}'
             graph_properties[name] = graph_properties_func(*params)
             graphs[name] = graph
 
@@ -1748,7 +1748,7 @@ def generate_graphs(count, graph_type):
     if choice == 'adj':
         prefix = click.prompt('Enter the file name prefix', type=str, default="")
         for name, graph in graphs.items():
-            save_graph_as_adj_list(graph, f'{prefix}_{name}')
+            save_graph_as_adj_list(graph, f'{prefix}-{name}')
     elif choice == 'k8s':
         # generate k8s graph resource .yaml file
         graph_type_string = get_graph_type_long(graph_type)
@@ -1791,7 +1791,7 @@ def generate_graphs(count, graph_type):
             if choice == 'add':
                 name_string = added_prefix + name
             elif choice == 'own':
-                name_string = f'{own_prefix}_{i + 1}'
+                name_string = f'{own_prefix}-{i + 1}'
             else:
                 name_string = name
             # create value list string

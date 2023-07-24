@@ -145,7 +145,7 @@ def update_last_import_date(last_import_table_name):
             last_import_date = datetime.strptime(result[0], format_string)
             timezone = pytz.timezone('Europe/Paris')
             last_import_date = timezone.localize(last_import_date)
-            cursor.execute("UPDATE LAST_IMPORT_DATE_AVERAGED SET date = ?", (current_timestamp,))
+            cursor.execute(f"UPDATE {last_import_table_name} SET date = ?", (current_timestamp,))
 
     return last_import_date
 
@@ -240,8 +240,10 @@ def insert_df_into_db_table(df, table_name):
         cursor.execute(insert_query, tuple(row))
 
 
-insert_df_into_db_table(df_averaged_results, table_name_averaged_results)
-insert_df_into_db_table(df_averaged_summaries, table_name_summaries)
+if df_averaged_results.size > 0:
+    insert_df_into_db_table(df_averaged_results, table_name_averaged_results)
+if df_averaged_summaries.size > 0:
+    insert_df_into_db_table(df_averaged_summaries, table_name_summaries)
 
 conn.commit()
 # Close the database connection

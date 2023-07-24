@@ -3,7 +3,7 @@ kind: Graph
 metadata:
   labels:
     series: series3
-  name: fixpo-n1000-c10-n1-1800-n2-200_5
+  name: fixpo-n1000-c10-n1-1800-n2-200-5
 spec:
   adjacencyList:
   - "0 43 94 46 47 65,"

@@ -3,7 +3,7 @@ kind: Graph
 metadata:
   labels:
     series: series2
-  name: barab-n1000-e2.0_18
+  name: barab-n1000-e2.0-18
 spec:
   adjacencyList:
   - "0 1 2 3 6 7 11 18 22 27 30 39 46 78 80 84 95 142 174 214 241 253 306 327 345 346 443 447 460 519 533 535 555 571 599 694 701 830 927,"
