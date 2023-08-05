@@ -2,14 +2,9 @@
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A:
 -----------------------------------------------------------------------------------------------------------------------
-- 1.2 aufbau
-- zusammenfassung (abstract)
-- related work (esch papers on graph generation)
-
-- "kantengrad" powerlaw misunderstanding
--> differentiation edge degree (3/13) (for related work ?)
-
-- proof-reading + korrektur + überarbeitung
+- proof-reading + korrektur + überarbeitung:
+- vgl. Typische Gliederung einer Abschlussarbeit
+- wann leseprobe?
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B:
 -----------------------------------------------------------------------------------------------------------------------

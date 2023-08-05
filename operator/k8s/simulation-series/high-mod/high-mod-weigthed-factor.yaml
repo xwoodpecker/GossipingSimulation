@@ -1,0 +1,21 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: high-mod-weighted-factor
+spec:
+  graphSelector:
+    matchLabels:
+      series: high-mod-series
+  algorithm: weighted_factor
+  visualize: false
+  randomInitialization: false
+  repetitions: 2
+  factor:
+    - 1.25
+    - 1.5
+    - 1.75
+    - 2
+    - 2.25
+    - 2.5
+    - 2.75
+    - 3

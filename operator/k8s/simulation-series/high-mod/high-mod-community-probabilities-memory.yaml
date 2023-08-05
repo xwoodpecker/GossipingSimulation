@@ -1,0 +1,16 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: high-mod-community-probabilities-memory
+spec:
+  graphSelector:
+    matchLabels:
+      series: high-mod-series
+  algorithm: community_probabilities_memory
+  visualize: false
+  randomInitialization: false
+  repetitions: 2
+  priorPartnerFactor:
+    - 0.25
+    - 0.5
+    - 0.75

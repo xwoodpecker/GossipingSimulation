@@ -1,0 +1,12 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: high-mod-community-probabilities
+spec:
+  graphSelector:
+    matchLabels:
+      series: high-mod-series
+  algorithm: community_probabilities
+  visualize: false
+  randomInitialization: false
+  repetitions: 2
