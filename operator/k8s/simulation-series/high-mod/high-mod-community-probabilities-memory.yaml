@@ -9,7 +9,7 @@ spec:
   algorithm: community_probabilities_memory
   visualize: false
   randomInitialization: false
-  repetitions: 2
+  repetitions: 1
   priorPartnerFactor:
     - 0.25
     - 0.5

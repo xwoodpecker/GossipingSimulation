@@ -9,4 +9,4 @@ spec:
   algorithm: community_probabilities
   visualize: false
   randomInitialization: false
-  repetitions: 2
+  repetitions: 1

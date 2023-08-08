@@ -2,7 +2,7 @@ apiVersion: gossip.io/v1
 kind: Graph
 metadata:
   labels:
-    series: high-mod
+    series: high-mod-series
   name: holme-n1000-e1.1029-t0.9143-1
 spec:
   adjacencyList:
