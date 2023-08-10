@@ -21,14 +21,16 @@
 ~Refactor~
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A
+- implement italian gossiping variation
+- try to include hub (- for same comm hubs, + for different comm hubs) and centrality data in neighboring selection
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
 - define new test series for finding the optimal algorithm (select graphs)
-- maybe use log scale probability values for comm prob alg
+- maybe use log scale probability values for comm prob alg (SEEMS UNNECESSARY, re-check after comparison)
 - develop top grade new algorithm "ULTIMATE GOSSIPING" (what did the italians do?)
-- add more notebooks
+- add more notebooks, refactor high-mod notebook
 -----------------------------------------------------------------------------------------------------------------------
 *Prio C
 -----------------------------------------------------------------------------------------------------------------------

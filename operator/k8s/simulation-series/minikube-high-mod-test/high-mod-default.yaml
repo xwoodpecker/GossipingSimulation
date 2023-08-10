@@ -1,0 +1,12 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: high-mod-test-default
+spec:
+  graphSelector:
+    matchLabels:
+      series: high-mod-test
+  algorithm: default
+  visualize: false
+  randomInitialization: false
+  repetitions: 1
