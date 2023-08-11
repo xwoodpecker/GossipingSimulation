@@ -1,7 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./shared",
-        "./container-apps/service/grpc_compiled",
-        "./container-apps/runner/grpc_compiled"
-    ]
-}

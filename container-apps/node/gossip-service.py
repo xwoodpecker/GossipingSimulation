@@ -440,6 +440,321 @@ class CommunityProbabilitiesComplexMemory(CommunityProbabilities, ComplexMemory)
         super().set_next_memory_parameters()
 
 
+class WeightUpdate:
+    """
+    Represents the weight update component.
+    """
+
+    def update_weights(self, other_weights, a, b):
+        """
+        Update weights based on a combination of self weights and other weights.
+
+        Args:
+            other_weights (list): List of weights from other source.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for other weights.
+        """
+        updated_weights = {}
+        for idx, n in enumerate(self.neighbors):
+            updated_weights[n] = a * self.weights[n] + b * other_weights[idx]
+        self.weights = updated_weights
+
+
+class BetweennessCommunityProbabilities(CommunityProbabilities, WeightUpdate):
+    """
+    Represents the betweenness centrality and community probability algorithm.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 betweenness_centralities_neighbors, a, b):
+        """
+        Initialize BetweennessCommunityProbabilities instance.
+
+        Args:
+            name (str): The name of the instance.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            betweenness_centralities_neighbors (list): List of betweenness centralities for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for betweenness centralities.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors)
+        self.betweenness_centralities_neighbors = betweenness_centralities_neighbors
+        self.a = a
+        self.b = b
+        self.update_weights(betweenness_centralities_neighbors, a, b)
+
+
+class BetweennessCommunityProbabilitiesMemory(BetweennessCommunityProbabilities, Memory):
+    """
+    Represents a betweenness centrality and community probabilities memory algorithm that inherits from both
+    BetweennessCommunityProbabilities and Memory.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 betweenness_centralities_neighbors, a, b, prior_partner_factors):
+        """
+        Initialize the betweenness centrality and community probabilities memory.
+
+        Args:
+            name (str): The name of the memory.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            betweenness_centralities_neighbors (list): List of betweenness centralities for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for betweenness centralities.
+            prior_partner_factors (list): The prior partner factors.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors,
+                         betweenness_centralities_neighbors, a, b)
+        super().init_memory(prior_partner_factors)
+
+    def set_next_parameters(self):
+        """
+        Sets the next parameters from the list.
+        """
+        super().set_next_memory_parameters()
+
+
+class BetweennessCommunityProbabilitiesMemory(BetweennessCommunityProbabilities, ComplexMemory):
+    """
+    Represents a betweenness centrality and community probabilities complex memory algorithm that inherits from both
+    BetweennessCommunityProbabilities and ComplexMemory.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 betweenness_centralities_neighbors, a, b, prior_partner_factors):
+        """
+        Initialize the betweenness centrality and community probabilities complex memory.
+
+        Args:
+            name (str): The name of the memory.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            betweenness_centralities_neighbors (list): List of betweenness centralities for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for betweenness centralities.
+            prior_partner_factors (list): The prior partner factors.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors,
+                         betweenness_centralities_neighbors, a, b)
+        super().init_memory(prior_partner_factors)
+
+    def set_next_parameters(self):
+        """
+        Sets the next parameters from the list.
+        """
+        super().set_next_memory_parameters()
+
+
+class EigenvectorCommunityProbabilities(CommunityProbabilities, WeightUpdate):
+    """
+    Represents the eigenvector centrality and community probability algorithm.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 eigenvector_centralities_neighbors, a, b):
+        """
+        Initialize EigenvectorCommunityProbabilities instance.
+
+        Args:
+            name (str): The name of the instance.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            eigenvector_centralities_neighbors (list): List of eigenvector centralities for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for eigenvector centralities.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors)
+        self.eigenvector_centralities_neighbors = eigenvector_centralities_neighbors
+        self.a = a
+        self.b = b
+        self.update_weights(eigenvector_centralities_neighbors, a, b)
+
+
+class EigenvectorCommunityProbabilitiesMemory(EigenvectorCommunityProbabilities, Memory):
+    """
+    Represents a combination of eigenvector centrality, community probabilities, and memory algorithm.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 eigenvector_centralities_neighbors, a, b, prior_partner_factors):
+        """
+        Initialize the combined memory algorithm.
+
+        Args:
+            name (str): The name of the memory.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            eigenvector_centralities_neighbors (list): List of eigenvector centralities for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for eigenvector centralities.
+            prior_partner_factors (list): The prior partner factors.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors,
+                         eigenvector_centralities_neighbors, a, b)
+        super().init_memory(prior_partner_factors)
+
+    def set_next_parameters(self):
+        """
+        Sets the next parameters from the list.
+        """
+        super().set_next_memory_parameters()
+
+
+class EigenvectorCommunityProbabilitiesComplexMemory(EigenvectorCommunityProbabilities, ComplexMemory):
+    """
+    Represents a combination of eigenvector centrality, community probabilities, and complex memory algorithm.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 eigenvector_centralities_neighbors, a, b, prior_partner_factors):
+        """
+        Initialize the combined complex memory algorithm.
+
+        Args:
+            name (str): The name of the memory.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            eigenvector_centralities_neighbors (list): List of eigenvector centralities for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for eigenvector centralities.
+            prior_partner_factors (list): The prior partner factors.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors,
+                         eigenvector_centralities_neighbors, a, b)
+        super().init_memory(prior_partner_factors)
+
+    def set_next_parameters(self):
+        """
+        Sets the next parameters from the list.
+        """
+        super().set_next_memory_parameters()
+
+
+class HubScoreCommunityProbabilities(CommunityProbabilities, WeightUpdate):
+    """
+    Represents the hubScore centrality and community probability algorithm.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 hub_scores_neighbors, a, b):
+        """
+        Initialize HubScoreCommunityProbabilities instance.
+
+        Args:
+            name (str): The name of the instance.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            hub_scores_neighbors (list): List of hub scores for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for hubScore centralities.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors)
+        self.hub_scores_neighbors = hub_scores_neighbors
+        self.a = a
+        self.b = b
+        self.update_weights(hub_scores_neighbors, a, b)
+
+
+class HubScoreCommunityProbabilitiesMemory(HubScoreCommunityProbabilities, Memory):
+    """
+    Represents a combination of hubScore centrality, community probabilities, and memory algorithm.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 hub_scores_neighbors, a, b, prior_partner_factors):
+        """
+        Initialize the combined memory algorithm.
+
+        Args:
+            name (str): The name of the memory.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            hub_scores_neighbors (list): List of hub scores for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for hubScore centralities.
+            prior_partner_factors (list): The prior partner factors.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors,
+                         hub_scores_neighbors, a, b)
+        super().init_memory(prior_partner_factors)
+
+    def set_next_parameters(self):
+        """
+        Sets the next parameters from the list.
+        """
+        super().set_next_memory_parameters()
+
+
+class HubScoreCommunityProbabilitiesComplexMemory(HubScoreCommunityProbabilities, ComplexMemory):
+    """
+    Represents a combination of hubScore centrality, community probabilities, and complex memory algorithm.
+    """
+
+    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
+                 hub_scores_neighbors, a, b, prior_partner_factors):
+        """
+        Initialize the combined complex memory algorithm.
+
+        Args:
+            name (str): The name of the memory.
+            neighbors (list): List of neighbors.
+            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
+            hub_scores_neighbors (list): List of hub scores for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for hubScore centralities.
+            prior_partner_factors (list): The prior partner factors.
+        """
+        super().__init__(name, neighbors, same_community_probabilities_neighbors,
+                         hub_scores_neighbors, a, b)
+        super().init_memory(prior_partner_factors)
+
+    def set_next_parameters(self):
+        """
+        Sets the next parameters from the list.
+        """
+        super().set_next_memory_parameters()
+
+
+class CommunityBased(Algorithm):
+    """
+    Represents the community based algorithm from related work object that inherits from Algorithm.
+    """
+
+    def __init__(self, name, neighbors, neighboring_communities):
+        """
+        Initialize the community based.
+
+        Args:
+            name (str): The name of the weighted factor.
+            neighbors (list): The list of neighbors.
+            neighboring_communities (list): The list of neighboring communities.
+        """
+        super().__init__(name, neighbors)
+        self.neighboring_communities = neighboring_communities
+        # Calculate the community members count
+        self.community_members_count_dict = {}
+        for comm in self.neighboring_communities:
+            if comm not in self.community_members_count_dict:
+                self.community_members_count_dict[comm] = 1
+            else:
+                self.community_members_count_dict[comm] += 1
+
+        # Calculate the number of distinct communities
+        self.comm_count = len(self.community_members_count_dict)
+        self.compute_weights()
+        log.info(f'Initialized CommunityBased.')
+
+    def compute_weights(self):
+        self.weights = {}
+        for index, neighbor in enumerate(self.neighbors):
+            neighbor_community = self.neighboring_communities[index]
+            # Calculate the weight based on the formula
+            weight = (1 / self.comm_count) * (1 / self.community_members_count_dict[neighbor_community])
+            self.weights[neighbor] = weight
+
+
 class GossipService(gossip_pb2_grpc.GossipServicer):
     """
     Represents a Gossip service that implements the GossipServicer interface.
