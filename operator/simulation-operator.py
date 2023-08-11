@@ -8,6 +8,8 @@ from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 import networkx as nx
 import community as community_louvain
+from networkx import PowerIterationFailedConvergence
+
 from cfg import *
 
 # Create a custom logger
@@ -174,6 +176,28 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                             community_probabilities[node][neighbor_cluster] = 0
                         community_probabilities[node][neighbor_cluster] += 1 / neighbor_count
 
+            if algorithm in BETWEENNESS_SET:
+                betweenness_centralities = nx.betweenness_centrality(graph)
+
+            if algorithm in EIGENVECTOR_SET:
+                try:
+                    eigenvector_centralities = nx.eigenvector_centrality(graph, max_iter=1000)
+                except PowerIterationFailedConvergence:
+                    log.error('Could not compute eigenvector centralities. Aborting...')
+                    try:
+                        customs_api.delete_namespaced_custom_object(
+                            namespace=namespace,
+                            name=name
+                        )
+                        print(f"Custom resource {name} deleted successfully.")
+                    except client.ApiException as e:
+                        print(f"Error deleting custom resource {name}: {e}")
+                    return
+
+            if algorithm in HUB_SCORE_SET:
+                hub_scores, authority_scores = nx.hits(graph)
+
+
         # memory algorithms use a factor to modify the probability
         # of selecting a partner that has already been selected in a previous gossiping
         if algorithm in MEMORY_SET:
@@ -241,8 +265,10 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
 
                     env = []
 
+                    neighbor_nodes = neighbors[node]
+
                     # set environment variables
-                    neighbors_str = ','.join([get_resource_name(graph_index, name, n) for n in neighbors[node]])
+                    neighbors_str = ','.join([get_resource_name(graph_index, name, n) for n in neighbor_nodes])
                     env.append(client.V1EnvVar(name=ENVIRONMENT_NEIGHBORS, value=neighbors_str))
                     env.append(client.V1EnvVar(name=ENVIRONMENT_ALGORITHM, value=algorithm))
                     env.append(client.V1EnvVar(name=ENVIRONMENT_REPETITIONS, value=str(repetitions)))
@@ -256,7 +282,6 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                         community_id = node_community_dict[node]
                         community_nodes = community_node_dict[community_id]
                         # extract community and non-community neighbors
-                        neighbor_nodes = set(neighbors[node])
                         community_neighbors = []
                         # non_community_neighbors = []
                         for neighbor_node in neighbor_nodes:
@@ -274,7 +299,6 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                     if algorithm in COMMUNITY_PROBABILITIES_SET:
                         # set the same community probabilities of the neighbors for the current node
                         community_id = node_community_dict[node]
-                        neighbor_nodes = neighbors[node]
 
                         same_community_probabilities_neighbors = []
                         for neighbor in neighbor_nodes:
@@ -288,6 +312,57 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                         )
                         env.append(client.V1EnvVar(name=ENVIRONMENT_SAME_COMMUNITY_PROBABILITIES_NEIGHBORS,
                                                    value=same_community_probabilities_neighbors_str))
+
+                    if algorithm in COMMUNITY_BASED_SET:
+                        neighboring_communities = []
+                        for neighbor in neighbor_nodes:
+                            neighbor_community = node_community_dict[neighbor]
+                            neighboring_communities.append(neighbor_community)
+                        neighboring_communities_str = ','.join(neighboring_communities)
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_NEIGHBORING_COMMUNITIES,
+                                                   value=neighboring_communities_str))
+
+                    def get_data_for_neighbors(dictionary, neighbor_list):
+                        neighbor_data_list = []
+                        for n in neighbor_list:
+                            neighbor_data = dictionary[n]
+                            neighbor_data_list.append(neighbor_data)
+                        return neighbor_data_list
+
+                    if algorithm in BETWEENNESS_SET:
+                        betweenness_centralities_neighbors \
+                            = get_data_for_neighbors(betweenness_centralities, neighbor_nodes)
+
+                        betweenness_centralities_neighbors_str = ','.join(
+                            str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
+                            for item
+                            in betweenness_centralities_neighbors
+                        )
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_BETWEENNESS_CENTRALITIES_NEIGHBORS,
+                                                   value=betweenness_centralities_neighbors_str))
+
+                    if algorithm in EIGENVECTOR_SET:
+                        eigenvector_centralities_neighbors \
+                            = get_data_for_neighbors(eigenvector_centralities, neighbor_nodes)
+
+                        eigenvector_centralities_neighbors_str = ','.join(
+                            str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
+                            for item
+                            in eigenvector_centralities_neighbors
+                        )
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_EIGENVECTOR_CENTRALITIES_NEIGHBORS,
+                                                   value=betweenness_centralities_neighbors_str))
+
+                    if algorithm in HUB_SCORE_SET:
+                        hub_scores_neighbors = get_data_for_neighbors(hub_scores, neighbor_nodes)
+
+                        hub_scores_neighbors_str = ','.join(
+                            str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
+                            for item
+                            in hub_scores_neighbors
+                        )
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_HUB_SCORES_NEIGHBORS,
+                                                   value=hub_scores_neighbors_str))
 
                     # memory algorithm specific environment variables
                     if algorithm in MEMORY_SET:

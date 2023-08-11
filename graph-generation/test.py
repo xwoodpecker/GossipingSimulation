@@ -7,7 +7,7 @@ from io import StringIO
 # Sample adjacency list string (replace with your actual adjacency list)
 from community import community_louvain
 
-adjacency_list_string = """
+adjacency_list_string1 = """
 0 2 3 4 6 7 16 17 19 23 25 27 33 46,
 1 2,
 2 5 7 19 26,
@@ -61,7 +61,7 @@ adjacency_list_string = """
 """
 
 
-adjacency_list_string = """
+adjacency_list_string2 = """
 0 1 4 5 8 10 20 39 42,
 1 2 3 12 13 17 24 35,
 2 15 23,
@@ -116,7 +116,7 @@ adjacency_list_string = """
 
 # Parse the adjacency list string and create the graph
 G = nx.Graph()
-for line in adjacency_list_string.strip().split('\n'):
+for line in adjacency_list_string1.strip().split('\n'):
     nodes = line.strip().split(',')
     source, *neighbors = map(int, nodes[0].split())
     G.add_node(source)
@@ -132,7 +132,6 @@ authority_scores_array = [authority_scores[node] for node in sorted(G.nodes())]
 print("Hub Scores:", hub_scores_array)
 print("Authority Scores:", authority_scores_array)
 
-
 # Compute degree centrality
 degree_centralities = nx.degree_centrality(G)
 print("degree_centralities:", degree_centralities)
@@ -140,6 +139,11 @@ print("degree_centralities:", degree_centralities)
 betweenness_centralities = nx.betweenness_centrality(G)
 print("betweenness_centralities:", betweenness_centralities)
 
+eigenvector_centralities = nx.eigenvector_centrality(G)
+print("eigenvector_centralities:", eigenvector_centralities)
+
+clustering_coeffs = nx.clustering(G)
+print("clustering_coeffs:", clustering_coeffs)
 
 partition = community_louvain.best_partition(G)
 partition = {int(k): int(v) for k, v in partition.items()}
@@ -167,6 +171,15 @@ for node in G.nodes:
     neighbors[node] = list(G.neighbors(node))
 
 
+betweenness_centralities_neighbors = {}
+for node in G.nodes:
+    node_betweenness_centralities = []
+    for neighbor in neighbors[node]:
+        neighbor_betweenness_centrality = betweenness_centralities[neighbor]
+        node_betweenness_centralities.append(neighbor_betweenness_centrality)
+    betweenness_centralities_neighbors[node] = node_betweenness_centralities
+
+
 # Compute the community_probabilities for each cluster for each node
 community_probabilities = {}
 for node, cluster in partition.items():
@@ -178,6 +191,8 @@ for node, cluster in partition.items():
         if neighbor_cluster not in community_probabilities[node]:
             community_probabilities[node][neighbor_cluster] = 0
         community_probabilities[node][neighbor_cluster] += 1 / neighbor_count
+
+
 
 node_same_community_probabilities_neighbors = {}
 for node in G.nodes:
