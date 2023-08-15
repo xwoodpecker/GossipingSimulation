@@ -1014,7 +1014,7 @@ spec:
     averageClosenessCentrality: "0.5121"
     averageDegreeCentrality: "0.0419"
     averageEccentricity: "1.999"
-    averagenodeDegree: "41.876"
+    averageNodeDegree: "41.876"
     averageEigenvectorCentrality: "0.024"
     averageHubScore: "0.001"
     averageNeighborsDegree: "301.4229"

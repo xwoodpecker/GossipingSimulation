@@ -21,18 +21,23 @@
 ~Refactor~
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A
-- implement italian gossiping variation
-- try to include hub (- for same comm hubs, + for different comm hubs) and centrality data in neighboring selection
+- finish service implementation (check if all new algorithms are present,
+  implement initialization and a/b factorisation)
+- test + refactor algorithms
+- analyze high mod <-> mod relation
 -----------------------------------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
 -----------------------------------------------------------------------------------------------------------------------
 - define new test series for finding the optimal algorithm (select graphs)
-- maybe use log scale probability values for comm prob alg (SEEMS UNNECESSARY, re-check after comparison)
-- develop top grade new algorithm "ULTIMATE GOSSIPING" (what did the italians do?)
 - add more notebooks, refactor high-mod notebook
 -----------------------------------------------------------------------------------------------------------------------
 *Prio C
 -----------------------------------------------------------------------------------------------------------------------
+...
+-----------------------------------------------------------------------------------------------------------------------
+*Prio Z
+-----------------------------------------------------------------------------------------------------------------------
+- refactor algorithm inheritance/interface logic (cfg.py and service.py)
 -----------------------------------------------------------------------------------------------------------------------
 

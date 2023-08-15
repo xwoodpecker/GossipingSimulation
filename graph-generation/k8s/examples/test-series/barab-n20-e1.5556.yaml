@@ -34,7 +34,7 @@ spec:
     averageCommunitySize: "9.5"
     averageDegreeCentrality: "0.1316"
     averageEccentricity: "4.05"
-    averagenodeDegree: "2.5"
+    averageNodeDegree: "2.5"
     averageEigenvectorCentrality: "0.179"
     averageHubScore: "0.05"
     averageNeighborsDegree: "5.7439"

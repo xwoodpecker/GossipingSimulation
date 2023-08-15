@@ -354,7 +354,7 @@ def compute_metrics():
 
         computed_avg_degree = compute_average_node_degree(graph)
         # print(f'The graph has a computed average degree of {computed_avg_degree}.')
-        graph_properties[name]['averagenodeDegree'] = computed_avg_degree
+        graph_properties[name]['averageNodeDegree'] = computed_avg_degree
         computed_stdev_degree = compute_stdev_node_degree(graph)
         graph_properties[name]['stdevnodeDegree'] = computed_stdev_degree
 
