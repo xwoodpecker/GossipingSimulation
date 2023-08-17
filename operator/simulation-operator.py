@@ -178,7 +178,6 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
 
             if algorithm in ADVANCED_CLUSTERING_SET:
                 weighting_params_a = spec.get('weightingParamA', [DEFAULT_WEIGHTING_PARAM])
-                weighting_params_b = spec.get('weightingParamB', [DEFAULT_WEIGHTING_PARAM])
 
                 if algorithm in BETWEENNESS_SET:
                     betweenness_centralities = nx.betweenness_centrality(graph)
@@ -329,15 +328,13 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                     def get_data_for_neighbors(dictionary, neighbor_list):
                         neighbor_data_list = []
                         for n in neighbor_list:
-                            neighbor_data = dictionary[n]
+                            neighbor_data = dictionary[str(n)]
                             neighbor_data_list.append(neighbor_data)
                         return neighbor_data_list
 
                     if algorithm in ADVANCED_CLUSTERING_SET:
                         env.append(client.V1EnvVar(name=ENVIRONMENT_WEIGHTING_PARAM_A,
                                                    value=','.join(str(param) for param in weighting_params_a)))
-                        env.append(client.V1EnvVar(name=ENVIRONMENT_WEIGHTING_PARAM_B,
-                                                   value=','.join(str(param) for param in weighting_params_b)))
 
                         if algorithm in BETWEENNESS_SET:
                             betweenness_centralities_neighbors \
@@ -549,8 +546,6 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
             if algorithm in ADVANCED_CLUSTERING_SET:
                 env.append(client.V1EnvVar(name=ENVIRONMENT_WEIGHTING_PARAM_A,
                                            value=','.join(str(param) for param in weighting_params_a)))
-                env.append(client.V1EnvVar(name=ENVIRONMENT_WEIGHTING_PARAM_B,
-                                           value=','.join(str(param) for param in weighting_params_b)))
             if algorithm in MEMORY_SET:
                 env.append(client.V1EnvVar(name=ENVIRONMENT_PRIOR_PARTNER_FACTOR,
                                            value=','.join(str(factor) for factor in prior_partner_factors)))

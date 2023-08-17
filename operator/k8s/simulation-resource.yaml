@@ -47,10 +47,6 @@ spec:
                   type: array
                   items:
                     type: number
-                weightingParamB:
-                  type: array
-                  items:
-                    type: number
                 simulationProperties:
                   additionalProperties:
                     type: string

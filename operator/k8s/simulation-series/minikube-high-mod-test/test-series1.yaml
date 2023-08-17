@@ -1,0 +1,16 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: test-series
+spec:
+  graphSelector:
+    matchLabels:
+      series: high-mod-test
+  algorithm: betweenness_community_probabilities_memory
+  visualize: false
+  randomInitialization: false
+  repetitions: 1
+  priorPartnerFactor:
+    - 0.5
+  weightingParamA:
+    - 0.5

@@ -860,18 +860,13 @@ if __name__ == '__main__':
         algorithm_params[ENVIRONMENT_PRIOR_PARTNER_FACTOR] = prior_partner_factors
 
     params_a = []
-    params_b = []
     if algorithm in ADVANCED_CLUSTERING_SET:
         try:
             params_a = os.environ.get(ENVIRONMENT_WEIGHTING_PARAM_A).rstrip(',').split(",")
-            params_b = os.environ.get(ENVIRONMENT_WEIGHTING_PARAM_B).rstrip(',').split(",")
-            params_a = [float(param) for param in params_a]
-            params_b = [float(param) for param in params_b]
+            params_a = [float(param) if float(param) < 1 else 1 for param in params_a]
         except (ValueError, AttributeError):
             params_a = [DEFAULT_WEIGHTING_PARAM]
-            params_b = [DEFAULT_WEIGHTING_PARAM]
         algorithm_params[ENVIRONMENT_WEIGHTING_PARAM_A] = params_a
-        algorithm_params[ENVIRONMENT_WEIGHTING_PARAM_B] = params_b
 
     algorithm_param_keys = list(algorithm_params.keys())
     algorithm_param_values = list(algorithm_params.values())
