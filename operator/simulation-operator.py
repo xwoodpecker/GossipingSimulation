@@ -320,7 +320,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                         neighboring_communities = []
                         for neighbor in neighbor_nodes:
                             neighbor_community = node_community_dict[neighbor]
-                            neighboring_communities.append(neighbor_community)
+                            neighboring_communities.append(str(neighbor_community))
                         neighboring_communities_str = ','.join(neighboring_communities)
                         env.append(client.V1EnvVar(name=ENVIRONMENT_NEIGHBORING_COMMUNITIES,
                                                    value=neighboring_communities_str))

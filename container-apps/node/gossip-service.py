@@ -772,6 +772,9 @@ class CommunityBased(Algorithm):
             weight = (1 / self.comm_count) * (1 / self.community_members_count_dict[neighbor_community])
             self.weights[neighbor] = weight
 
+        log.info('TESTING - WEIGHTS:')
+        log.info(f'{self.weights}')
+
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
     """
@@ -1452,7 +1455,7 @@ if __name__ == '__main__':
                 init_advanced_community_probabilities_complex_memory,
             ALGORITHM_HUB_SCORE_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY:
                 init_advanced_community_probabilities_complex_memory,
-            ALGORITHM_COMMUNITY_BASED: init_community_based
+            ALGORITHM_COMMUNITY_BASED: init_community_based,
         }
         init_func = init_funcs.get(name, init_default_algorithm)
         algorithm = init_func()
