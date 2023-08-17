@@ -193,7 +193,7 @@ class DefaultMemory(Algorithm, Memory):
         self.weights = {}
         for neighbor in self.neighbors:
             self.weights[neighbor] = 1.0
-        super().init_memory(prior_partner_factors)
+        self.init_memory(prior_partner_factors)
 
     def select_neighbor(self):
         """
@@ -230,7 +230,7 @@ class DefaultComplexMemory(Algorithm, ComplexMemory):
         self.weights = {}
         for neighbor in self.neighbors:
             self.weights[neighbor] = 1.0
-        super().init_memory(prior_partner_factors)
+        self.init_memory(prior_partner_factors)
 
     def select_neighbor(self):
         """
@@ -320,13 +320,13 @@ class WeightedFactorMemory(WeightedFactor, Memory):
             prior_partner_factors (list): The prior partner factors.
         """
         super().__init__(name, neighbors, community_neighbors, factors)
-        super().init_memory(prior_partner_factors)
+        self.init_memory(prior_partner_factors)
 
     def set_next_parameters(self):
         """
         Sets the next parameters from the list.
         """
-        super().set_next_memory_parameters()
+        self.set_next_memory_parameters()
         super().set_next_parameters()
 
 
@@ -347,13 +347,13 @@ class WeightedFactorComplexMemory(WeightedFactor, ComplexMemory):
             prior_partner_factors (list): The prior partner factors.
         """
         super().__init__(name, neighbors, community_neighbors, factors)
-        super().init_memory(prior_partner_factors)
+        self.init_memory(prior_partner_factors)
 
     def set_next_parameters(self):
         """
         Sets the next parameters from the list.
         """
-        super().set_next_memory_parameters()
+        self.set_next_memory_parameters()
         super().set_next_parameters()
 
 
@@ -406,13 +406,13 @@ class CommunityProbabilitiesMemory(CommunityProbabilities, Memory):
             prior_partner_factors (list): The prior partner factors.
         """
         super().__init__(name, neighbors, same_community_probabilities_neighbors)
-        super().init_memory(prior_partner_factors)
+        self.init_memory(prior_partner_factors)
 
     def set_next_parameters(self):
         """
         Sets the next parameters from the list.
         """
-        super().set_next_memory_parameters()
+        self.set_next_memory_parameters()
 
 
 class CommunityProbabilitiesComplexMemory(CommunityProbabilities, ComplexMemory):
@@ -431,13 +431,13 @@ class CommunityProbabilitiesComplexMemory(CommunityProbabilities, ComplexMemory)
             prior_partner_factors (list): The prior partner factors.
         """
         super().__init__(name, neighbors, same_community_probabilities_neighbors)
-        super().init_memory(prior_partner_factors)
+        self.init_memory(prior_partner_factors)
 
     def set_next_parameters(self):
         """
         Sets the next parameters from the list.
         """
-        super().set_next_memory_parameters()
+        self.set_next_memory_parameters()
 
 
 class WeightUpdate:
@@ -460,261 +460,148 @@ class WeightUpdate:
         self.weights = updated_weights
 
 
-class BetweennessCommunityProbabilities(CommunityProbabilities, WeightUpdate):
+class AdvancedWeightedFactor(WeightedFactor, WeightUpdate):
     """
-    Represents the betweenness centrality and community probability algorithm.
+    Represents the combination of advanced centrality and weighted factor algorithm.
+    Inherits from both WeightedFactor and WeightUpdate.
+    """
+
+    def __init__(self, name, neighbors, community_neighbors, factors,
+                 advanced_weights_neighbors, a, b):
+        """
+        Initialize AdvancedWeightedFactor instance.
+
+        Args:
+            name (str): The name of the instance.
+            neighbors (list): List of neighbors.
+            community_neighbors (list): List of community neighbors.
+            factors (list): The factor to prioritize non-community neighbors.
+            advanced_weights_neighbors (list): List of advanced weights for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for advanced weights.
+        """
+        super().__init__(name, neighbors, community_neighbors, factors)
+        self.update_weights(advanced_weights_neighbors, a, b)
+
+
+class AdvancedWeightedFactorMemory(WeightedFactorMemory, WeightUpdate):
+    """
+    Represents an advanced centrality and weighted factor memory algorithm
+    that inherits from both AdvancedWeightedFactor and Memory.
+    """
+
+    def __init__(self, name, neighbors, community_neighbors, factors,
+                 advanced_weights_neighbors, a, b, prior_partner_factors):
+        """
+        Initialize the advanced centrality and weighted factor memory.
+
+        Args:
+            name (str): The name of the instance.
+            neighbors (list): List of neighbors.
+            community_neighbors (list): List of community neighbors.
+            factors (list): The factor to prioritize non-community neighbors.
+            advanced_weights_neighbors (list): List of advanced weights for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for advanced weights.
+            prior_partner_factors (list): The prior partner factors.
+        """
+        super().__init__(name, neighbors, community_neighbors, factors, prior_partner_factors)
+        self.update_weights(advanced_weights_neighbors, a, b)
+
+
+class AdvancedWeightedFactorComplexMemory(WeightedFactorComplexMemory, WeightUpdate):
+    """
+    Represents an advanced centrality and weighted factor complex memory algorithm
+    that inherits from both AdvancedWeightedFactor and ComplexMemory.
+    """
+
+    def __init__(self, name, neighbors, community_neighbors, factors,
+                 advanced_weights_neighbors, a, b, prior_partner_factors):
+        """
+        Initialize the advanced centrality and weighted factor complex memory.
+
+        Args:
+            name (str): The name of the instance.
+            neighbors (list): List of neighbors.
+            community_neighbors (list): List of community neighbors.
+            factors (list): The factor to prioritize non-community neighbors.
+            advanced_weights_neighbors (list): List of advanced weights for neighbors.
+            a (float): Coefficient for self weights.
+            b (float): Coefficient for advanced weights.
+            prior_partner_factors (list): The prior partner factors.
+        """
+        super().__init__(name, neighbors, community_neighbors, factors, prior_partner_factors)
+        self.update_weights(advanced_weights_neighbors, a, b)
+
+
+class AdvancedCommunityProbabilities(CommunityProbabilities, WeightUpdate):
+    """
+    Represents the advanced centrality and community probability algorithm.
     """
 
     def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 betweenness_centralities_neighbors, a, b):
+                 advanced_weights_neighbors, a, b):
         """
-        Initialize BetweennessCommunityProbabilities instance.
+        Initialize AdvancedCommunityProbabilities instance.
 
         Args:
             name (str): The name of the instance.
             neighbors (list): List of neighbors.
             same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            betweenness_centralities_neighbors (list): List of betweenness centralities for neighbors.
+            advanced_weights_neighbors (list): List of advanced weights for neighbors.
             a (float): Coefficient for self weights.
-            b (float): Coefficient for betweenness centralities.
+            b (float): Coefficient for advanced weights.
         """
         super().__init__(name, neighbors, same_community_probabilities_neighbors)
-        self.betweenness_centralities_neighbors = betweenness_centralities_neighbors
-        self.a = a
-        self.b = b
-        self.update_weights(betweenness_centralities_neighbors, a, b)
+        self.update_weights(advanced_weights_neighbors, a, b)
 
 
-class BetweennessCommunityProbabilitiesMemory(BetweennessCommunityProbabilities, Memory):
+class AdvancedCommunityProbabilitiesMemory(CommunityProbabilitiesMemory, WeightUpdate):
     """
-    Represents a betweenness centrality and community probabilities memory algorithm that inherits from both
-    BetweennessCommunityProbabilities and Memory.
+    Represents an advanced centrality and community probabilities memory algorithm that inherits from both
+    AdvancedCommunityProbabilities and Memory.
     """
 
     def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 betweenness_centralities_neighbors, a, b, prior_partner_factors):
+                 advanced_weights_neighbors, a, b, prior_partner_factors):
         """
-        Initialize the betweenness centrality and community probabilities memory.
+        Initialize the advanced centrality and community probabilities memory.
 
         Args:
             name (str): The name of the memory.
             neighbors (list): List of neighbors.
             same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            betweenness_centralities_neighbors (list): List of betweenness centralities for neighbors.
+            advanced_weights_neighbors (list): List of advanced weights for neighbors.
             a (float): Coefficient for self weights.
-            b (float): Coefficient for betweenness centralities.
+            b (float): Coefficient for advanced weights.
             prior_partner_factors (list): The prior partner factors.
         """
-        super().__init__(name, neighbors, same_community_probabilities_neighbors,
-                         betweenness_centralities_neighbors, a, b)
-        super().init_memory(prior_partner_factors)
-
-    def set_next_parameters(self):
-        """
-        Sets the next parameters from the list.
-        """
-        super().set_next_memory_parameters()
+        super().__init__(name, neighbors, same_community_probabilities_neighbors, prior_partner_factors)
+        self.update_weights(advanced_weights_neighbors, a, b)
 
 
-class BetweennessCommunityProbabilitiesMemory(BetweennessCommunityProbabilities, ComplexMemory):
+class AdvancedCommunityProbabilitiesComplexMemory(CommunityProbabilitiesComplexMemory, WeightUpdate):
     """
-    Represents a betweenness centrality and community probabilities complex memory algorithm that inherits from both
-    BetweennessCommunityProbabilities and ComplexMemory.
+    Represents an advanced centrality and community probabilities complex memory algorithm that inherits from both
+    AdvancedCommunityProbabilities and ComplexMemory.
     """
 
     def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 betweenness_centralities_neighbors, a, b, prior_partner_factors):
+                 advanced_weights_neighbors, a, b, prior_partner_factors):
         """
-        Initialize the betweenness centrality and community probabilities complex memory.
+        Initialize the advanced centrality and community probabilities complex memory.
 
         Args:
             name (str): The name of the memory.
             neighbors (list): List of neighbors.
             same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            betweenness_centralities_neighbors (list): List of betweenness centralities for neighbors.
+            advanced_weights_neighbors (list): List of advanced weights for neighbors.
             a (float): Coefficient for self weights.
-            b (float): Coefficient for betweenness centralities.
+            b (float): Coefficient for advanced weights.
             prior_partner_factors (list): The prior partner factors.
         """
-        super().__init__(name, neighbors, same_community_probabilities_neighbors,
-                         betweenness_centralities_neighbors, a, b)
-        super().init_memory(prior_partner_factors)
-
-    def set_next_parameters(self):
-        """
-        Sets the next parameters from the list.
-        """
-        super().set_next_memory_parameters()
-
-
-class EigenvectorCommunityProbabilities(CommunityProbabilities, WeightUpdate):
-    """
-    Represents the eigenvector centrality and community probability algorithm.
-    """
-
-    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 eigenvector_centralities_neighbors, a, b):
-        """
-        Initialize EigenvectorCommunityProbabilities instance.
-
-        Args:
-            name (str): The name of the instance.
-            neighbors (list): List of neighbors.
-            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            eigenvector_centralities_neighbors (list): List of eigenvector centralities for neighbors.
-            a (float): Coefficient for self weights.
-            b (float): Coefficient for eigenvector centralities.
-        """
-        super().__init__(name, neighbors, same_community_probabilities_neighbors)
-        self.eigenvector_centralities_neighbors = eigenvector_centralities_neighbors
-        self.a = a
-        self.b = b
-        self.update_weights(eigenvector_centralities_neighbors, a, b)
-
-
-class EigenvectorCommunityProbabilitiesMemory(EigenvectorCommunityProbabilities, Memory):
-    """
-    Represents a combination of eigenvector centrality, community probabilities, and memory algorithm.
-    """
-
-    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 eigenvector_centralities_neighbors, a, b, prior_partner_factors):
-        """
-        Initialize the combined memory algorithm.
-
-        Args:
-            name (str): The name of the memory.
-            neighbors (list): List of neighbors.
-            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            eigenvector_centralities_neighbors (list): List of eigenvector centralities for neighbors.
-            a (float): Coefficient for self weights.
-            b (float): Coefficient for eigenvector centralities.
-            prior_partner_factors (list): The prior partner factors.
-        """
-        super().__init__(name, neighbors, same_community_probabilities_neighbors,
-                         eigenvector_centralities_neighbors, a, b)
-        super().init_memory(prior_partner_factors)
-
-    def set_next_parameters(self):
-        """
-        Sets the next parameters from the list.
-        """
-        super().set_next_memory_parameters()
-
-
-class EigenvectorCommunityProbabilitiesComplexMemory(EigenvectorCommunityProbabilities, ComplexMemory):
-    """
-    Represents a combination of eigenvector centrality, community probabilities, and complex memory algorithm.
-    """
-
-    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 eigenvector_centralities_neighbors, a, b, prior_partner_factors):
-        """
-        Initialize the combined complex memory algorithm.
-
-        Args:
-            name (str): The name of the memory.
-            neighbors (list): List of neighbors.
-            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            eigenvector_centralities_neighbors (list): List of eigenvector centralities for neighbors.
-            a (float): Coefficient for self weights.
-            b (float): Coefficient for eigenvector centralities.
-            prior_partner_factors (list): The prior partner factors.
-        """
-        super().__init__(name, neighbors, same_community_probabilities_neighbors,
-                         eigenvector_centralities_neighbors, a, b)
-        super().init_memory(prior_partner_factors)
-
-    def set_next_parameters(self):
-        """
-        Sets the next parameters from the list.
-        """
-        super().set_next_memory_parameters()
-
-
-class HubScoreCommunityProbabilities(CommunityProbabilities, WeightUpdate):
-    """
-    Represents the hubScore centrality and community probability algorithm.
-    """
-
-    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 hub_scores_neighbors, a, b):
-        """
-        Initialize HubScoreCommunityProbabilities instance.
-
-        Args:
-            name (str): The name of the instance.
-            neighbors (list): List of neighbors.
-            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            hub_scores_neighbors (list): List of hub scores for neighbors.
-            a (float): Coefficient for self weights.
-            b (float): Coefficient for hubScore centralities.
-        """
-        super().__init__(name, neighbors, same_community_probabilities_neighbors)
-        self.hub_scores_neighbors = hub_scores_neighbors
-        self.a = a
-        self.b = b
-        self.update_weights(hub_scores_neighbors, a, b)
-
-
-class HubScoreCommunityProbabilitiesMemory(HubScoreCommunityProbabilities, Memory):
-    """
-    Represents a combination of hubScore centrality, community probabilities, and memory algorithm.
-    """
-
-    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 hub_scores_neighbors, a, b, prior_partner_factors):
-        """
-        Initialize the combined memory algorithm.
-
-        Args:
-            name (str): The name of the memory.
-            neighbors (list): List of neighbors.
-            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            hub_scores_neighbors (list): List of hub scores for neighbors.
-            a (float): Coefficient for self weights.
-            b (float): Coefficient for hubScore centralities.
-            prior_partner_factors (list): The prior partner factors.
-        """
-        super().__init__(name, neighbors, same_community_probabilities_neighbors,
-                         hub_scores_neighbors, a, b)
-        super().init_memory(prior_partner_factors)
-
-    def set_next_parameters(self):
-        """
-        Sets the next parameters from the list.
-        """
-        super().set_next_memory_parameters()
-
-
-class HubScoreCommunityProbabilitiesComplexMemory(HubScoreCommunityProbabilities, ComplexMemory):
-    """
-    Represents a combination of hubScore centrality, community probabilities, and complex memory algorithm.
-    """
-
-    def __init__(self, name, neighbors, same_community_probabilities_neighbors,
-                 hub_scores_neighbors, a, b, prior_partner_factors):
-        """
-        Initialize the combined complex memory algorithm.
-
-        Args:
-            name (str): The name of the memory.
-            neighbors (list): List of neighbors.
-            same_community_probabilities_neighbors (list): List of same community probabilities for neighbors.
-            hub_scores_neighbors (list): List of hub scores for neighbors.
-            a (float): Coefficient for self weights.
-            b (float): Coefficient for hubScore centralities.
-            prior_partner_factors (list): The prior partner factors.
-        """
-        super().__init__(name, neighbors, same_community_probabilities_neighbors,
-                         hub_scores_neighbors, a, b)
-        super().init_memory(prior_partner_factors)
-
-    def set_next_parameters(self):
-        """
-        Sets the next parameters from the list.
-        """
-        super().set_next_memory_parameters()
+        super().__init__(name, neighbors, same_community_probabilities_neighbors, prior_partner_factors)
+        self.update_weights(advanced_weights_neighbors, a, b)
 
 
 class CommunityBased(Algorithm):
@@ -827,6 +714,10 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
             self.algorithm.remember(peer_name)
 
         self.gossip_lock.release()
+
+        log.info('TESTING - WEIGHTS:')
+        log.info(f'{self.algorithm.weights}')
+
         return peer_name
 
     def gossip(self):
@@ -839,6 +730,8 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         log.info('Starting to gossip.')
         try:
             self.gossip_lock.acquire()
+            log.info('TESTING - WEIGHTS:')
+            log.info(f'{self.algorithm.weights}')
             neighbor = self.algorithm.select_neighbor()
             log.info(f'Selecting neighbor {neighbor} to gossip using algorithm {self.algorithm.name}.')
             self.gossip_lock.release()
@@ -1028,6 +921,20 @@ if __name__ == '__main__':
             prior_partner_factors = [DEFAULT_PRIOR_PARTNER_FACTOR]
         algorithm_params[ENVIRONMENT_PRIOR_PARTNER_FACTOR] = prior_partner_factors
 
+    params_a = []
+    params_b = []
+    if algorithm_name in ADVANCED_CLUSTERING_SET:
+        try:
+            params_a = os.environ.get(ENVIRONMENT_WEIGHTING_PARAM_A).rstrip(',').split(",")
+            params_b = os.environ.get(ENVIRONMENT_WEIGHTING_PARAM_B).rstrip(',').split(",")
+            params_a = [float(param) for param in params_a]
+            params_b = [float(param) for param in params_b]
+        except (ValueError, AttributeError):
+            params_a = [DEFAULT_WEIGHTING_PARAM]
+            params_b = [DEFAULT_WEIGHTING_PARAM]
+        algorithm_params[ENVIRONMENT_WEIGHTING_PARAM_A] = params_a
+        algorithm_params[ENVIRONMENT_WEIGHTING_PARAM_B] = params_b
+
     algorithm_param_keys = list(algorithm_params.keys())
     algorithm_param_values = list(algorithm_params.values())
 
@@ -1193,6 +1100,153 @@ if __name__ == '__main__':
                                                    prior_partner_factors)
 
 
+    def init_advanced_weights():
+        """
+        Initialize the advanced weights for neighbors.
+
+        Returns:
+            list: The advanced weights for neighbors.
+        """
+        environment_advanced_weights = ''
+        if algorithm_name in BETWEENNESS_SET:
+            environment_advanced_weights = ENVIRONMENT_BETWEENNESS_CENTRALITIES_NEIGHBORS
+        if algorithm_name in EIGENVECTOR_SET:
+            environment_advanced_weights = ENVIRONMENT_EIGENVECTOR_CENTRALITIES_NEIGHBORS
+        if algorithm_name in HUB_SCORE_SET:
+            environment_advanced_weights = ENVIRONMENT_HUB_SCORES_NEIGHBORS
+        advanced_weights_str = os.environ.get(environment_advanced_weights).rstrip(',').split(",")
+        advanced_weights = [float(item) for item in advanced_weights_str]
+        log.info(f'Advanced weights set to {advanced_weights}')
+        return advanced_weights
+
+
+    def init_a_b():
+        """
+        Initialize the weighting params 'a' and 'b'
+
+        Returns:
+            tuple: A tuple containing the weighting params
+        """
+        params_a = [item[ENVIRONMENT_WEIGHTING_PARAM_A] for item in algorithm_param_combinations
+                    if ENVIRONMENT_WEIGHTING_PARAM_A in item]
+        log.info(f'Params a set to {params_a}')
+        params_b = [item[ENVIRONMENT_WEIGHTING_PARAM_B] for item in algorithm_param_combinations
+                    if ENVIRONMENT_WEIGHTING_PARAM_B in item]
+        log.info(f'Params b set to {params_b}')
+        return params_a, params_b
+
+
+    def init_advanced_weighted_factor():
+        """
+        Initialize the advanced weighted factor algorithm.
+
+        Returns:
+            AdvancedWeightedFactor: The advanced weighted factor.
+        """
+        community_neighbors, factors = init_communities_and_factors()
+        advanced_weights_neighbors = init_advanced_weights()
+        a, b = init_a_b()
+        return AdvancedWeightedFactor(algorithm_name, neighbors, community_neighbors, factors,
+                                      advanced_weights_neighbors, a, b)
+
+
+    def init_advanced_weighted_factor_memory():
+        """
+        Initialize the advanced weighted factor memory algorithm.
+
+        Returns:
+            AdvancedWeightedFactorMemory: The advanced weighted factor memory.
+        """
+        community_neighbors, factors = init_communities_and_factors()
+        prior_partner_factors = init_memory()
+        advanced_weights_neighbors = init_advanced_weights()
+        a, b = init_a_b()
+        return AdvancedWeightedFactorMemory(algorithm_name, neighbors, community_neighbors, factors,
+                                            advanced_weights_neighbors, prior_partner_factors, a, b)
+
+
+    def init_advanced_weighted_factor_complex_memory():
+        """
+        Initialize the advanced weighted factor complex memory algorithm.
+
+        Returns:
+            AdvancedWeightedFactorComplexMemory: The advanced weighted factor complex memory.
+        """
+        community_neighbors, factors = init_communities_and_factors()
+        prior_partner_factors = init_memory()
+        advanced_weights_neighbors = init_advanced_weights()
+        a, b = init_a_b()
+        return AdvancedWeightedFactorComplexMemory(algorithm_name, neighbors, community_neighbors, factors,
+                                                   advanced_weights_neighbors, prior_partner_factors, a, b)
+
+
+    def init_advanced_community_probabilities():
+        """
+        Initialize the advanced community probabilities algorithm.
+
+        Returns:
+            AdvancedCommunityProbabilities: The advanced community probabilities.
+        """
+        same_community_probabilities_neighbors = init_same_community_probabilities_neighbors()
+        advanced_weights_neighbors = init_advanced_weights()
+        return AdvancedCommunityProbabilities(algorithm_name, neighbors, same_community_probabilities_neighbors,
+                                              advanced_weights_neighbors)
+
+
+    def init_advanced_community_probabilities_memory():
+        """
+        Initialize the advanced community probabilities memory algorithm.
+
+        Returns:
+            AdvancedCommunityProbabilitiesMemory: The advanced community probabilities memory.
+        """
+        same_community_probabilities_neighbors = init_same_community_probabilities_neighbors()
+        prior_partner_factors = init_memory()
+        advanced_weights_neighbors = init_advanced_weights()
+        a, b = init_a_b()
+        return AdvancedCommunityProbabilitiesMemory(algorithm_name, neighbors, same_community_probabilities_neighbors,
+                                                    advanced_weights_neighbors, prior_partner_factors, a, b)
+
+
+    def init_advanced_community_probabilities_complex_memory():
+        """
+        Initialize the advanced community probabilities complex memory algorithm.
+
+        Returns:
+            AdvancedCommunityProbabilitiesComplexMemory: The advanced community probabilities complex memory.
+        """
+        same_community_probabilities_neighbors = init_same_community_probabilities_neighbors()
+        prior_partner_factors = init_memory()
+        advanced_weights_neighbors = init_advanced_weights()
+        a, b = init_a_b()
+        return AdvancedCommunityProbabilitiesComplexMemory(algorithm_name, neighbors,
+                                                           same_community_probabilities_neighbors,
+                                                           advanced_weights_neighbors, prior_partner_factors, a, b)
+
+
+    def init_community_based():
+        """
+        Initialize the community based algorithm.
+
+        Returns:
+            CommunityBased: The community based algorithm.
+        """
+        neighboring_communities = init_neighboring_communities()
+        return CommunityBased(algorithm_name, neighbors, neighboring_communities)
+
+
+    def init_neighboring_communities():
+        """
+        Initialize the neighboring communities.
+
+        Returns:
+            list: The neighboring communities.
+        """
+        neighboring_communities = os.environ.get(ENVIRONMENT_NEIGHBORING_COMMUNITIES).rstrip(',').split(",")
+        log.info(f'Neighboring communities set to {neighboring_communities}')
+        return neighboring_communities
+
+
     def init_algorithm(name):
         """
         Initialize the algorithm based on the given name.
@@ -1204,14 +1258,71 @@ if __name__ == '__main__':
             Algorithm: The initialized algorithm.
         """
         init_funcs = {
-            ALGORITHM_DEFAULT_MEMORY: init_default_memory,
-            ALGORITHM_DEFAULT_COMPLEX_MEMORY: init_default_complex_memory,
-            ALGORITHM_WEIGHTED_FACTOR: init_weighted_factor,
-            ALGORITHM_WEIGHTED_FACTOR_MEMORY: init_weighted_factor_memory,
-            ALGORITHM_WEIGHTED_FACTOR_COMPLEX_MEMORY: init_weighted_factor_complex_memory,
-            ALGORITHM_COMMUNITY_PROBABILITIES: init_community_probabilities,
-            ALGORITHM_COMMUNITY_PROBABILITIES_MEMORY: init_community_probabilities_memory,
-            ALGORITHM_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY: init_community_probabilities_complex_memory
+            ALGORITHM_DEFAULT_MEMORY:
+                init_default_memory,
+            ALGORITHM_DEFAULT_COMPLEX_MEMORY:
+                init_default_complex_memory,
+            ALGORITHM_WEIGHTED_FACTOR:
+                init_weighted_factor,
+            ALGORITHM_WEIGHTED_FACTOR_MEMORY:
+                init_weighted_factor_memory,
+            ALGORITHM_WEIGHTED_FACTOR_COMPLEX_MEMORY:
+                init_weighted_factor_complex_memory,
+            ALGORITHM_COMMUNITY_PROBABILITIES:
+                init_community_probabilities,
+            ALGORITHM_COMMUNITY_PROBABILITIES_MEMORY:
+                init_community_probabilities_memory,
+            ALGORITHM_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY:
+                init_community_probabilities_complex_memory,
+            # ALGORITHM_ADVANCED_WEIGHTED_FACTOR:
+            # init_advanced_weighted_factor,
+            # ALGORITHM_ADVANCED_WEIGHTED_FACTOR_MEMORY:
+            # init_advanced_weighted_factor_memory,
+            # ALGORITHM_ADVANCED_WEIGHTED_FACTOR_COMPLEX_MEMORY:
+            # init_advanced_weighted_factor_complex_memory,
+            # ALGORITHM_ADVANCED_COMMUNITY_PROBABILITIES:
+            # init_advanced_community_probabilities,
+            # ALGORITHM_ADVANCED_COMMUNITY_PROBABILITIES_MEMORY:
+            # init_advanced_community_probabilities_memory,
+            # ALGORITHM_ADVANCED_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY:
+            # init_advanced_community_probabilities_complex_memory,
+            ALGORITHM_BETWEENNESS_WEIGHTED:
+                init_advanced_weighted_factor,
+            ALGORITHM_BETWEENNESS_COMMUNITY_PROBABILITIES:
+                init_advanced_community_probabilities,
+            ALGORITHM_EIGENVECTOR_WEIGHTED:
+                init_advanced_weighted_factor,
+            ALGORITHM_EIGENVECTOR_COMMUNITY_PROBABILITIES:
+                init_advanced_community_probabilities,
+            ALGORITHM_HUB_SCORE_WEIGHTED:
+                init_advanced_weighted_factor,
+            ALGORITHM_HUB_SCORE_COMMUNITY_PROBABILITIES:
+                init_advanced_community_probabilities,
+            ALGORITHM_BETWEENNESS_WEIGHTED_MEMORY:
+                init_advanced_weighted_factor_memory,
+            ALGORITHM_EIGENVECTOR_WEIGHTED_MEMORY:
+                init_advanced_weighted_factor_memory,
+            ALGORITHM_HUB_SCORE_WEIGHTED_MEMORY:
+                init_advanced_weighted_factor_memory,
+            ALGORITHM_BETWEENNESS_WEIGHTED_COMPLEX_MEMORY:
+                init_advanced_weighted_factor_complex_memory,
+            ALGORITHM_EIGENVECTOR_WEIGHTED_COMPLEX_MEMORY:
+                init_advanced_weighted_factor_complex_memory,
+            ALGORITHM_HUB_SCORE_WEIGHTED_COMPLEX_MEMORY:
+                init_advanced_weighted_factor_complex_memory,
+            ALGORITHM_BETWEENNESS_COMMUNITY_PROBABILITIES_MEMORY:
+                init_advanced_community_probabilities_memory,
+            ALGORITHM_EIGENVECTOR_COMMUNITY_PROBABILITIES_MEMORY:
+                init_advanced_community_probabilities_memory,
+            ALGORITHM_HUB_SCORE_COMMUNITY_PROBABILITIES_MEMORY:
+                init_advanced_community_probabilities_memory,
+            ALGORITHM_BETWEENNESS_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY:
+                init_advanced_community_probabilities_complex_memory,
+            ALGORITHM_EIGENVECTOR_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY:
+                init_advanced_community_probabilities_complex_memory,
+            ALGORITHM_HUB_SCORE_COMMUNITY_PROBABILITIES_COMPLEX_MEMORY:
+                init_advanced_community_probabilities_complex_memory,
+            ALGORITHM_COMMUNITY_BASED: init_community_based
         }
         init_func = init_funcs.get(name, init_default_algorithm)
         algorithm = init_func()

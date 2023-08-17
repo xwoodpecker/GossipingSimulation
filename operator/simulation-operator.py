@@ -176,26 +176,30 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                             community_probabilities[node][neighbor_cluster] = 0
                         community_probabilities[node][neighbor_cluster] += 1 / neighbor_count
 
-            if algorithm in BETWEENNESS_SET:
-                betweenness_centralities = nx.betweenness_centrality(graph)
+            if algorithm in ADVANCED_CLUSTERING_SET:
+                weighting_params_a = spec.get('weightingParamA', [DEFAULT_WEIGHTING_PARAM])
+                weighting_params_b = spec.get('weightingParamB', [DEFAULT_WEIGHTING_PARAM])
 
-            if algorithm in EIGENVECTOR_SET:
-                try:
-                    eigenvector_centralities = nx.eigenvector_centrality(graph, max_iter=1000)
-                except PowerIterationFailedConvergence:
-                    log.error('Could not compute eigenvector centralities. Aborting...')
+                if algorithm in BETWEENNESS_SET:
+                    betweenness_centralities = nx.betweenness_centrality(graph)
+
+                if algorithm in EIGENVECTOR_SET:
                     try:
-                        customs_api.delete_namespaced_custom_object(
-                            namespace=namespace,
-                            name=name
-                        )
-                        print(f"Custom resource {name} deleted successfully.")
-                    except client.ApiException as e:
-                        print(f"Error deleting custom resource {name}: {e}")
-                    return
+                        eigenvector_centralities = nx.eigenvector_centrality(graph, max_iter=1000)
+                    except PowerIterationFailedConvergence:
+                        log.error('Could not compute eigenvector centralities. Aborting...')
+                        try:
+                            customs_api.delete_namespaced_custom_object(
+                                namespace=namespace,
+                                name=name
+                            )
+                            print(f"Custom resource {name} deleted successfully.")
+                        except client.ApiException as e:
+                            print(f"Error deleting custom resource {name}: {e}")
+                        return
 
-            if algorithm in HUB_SCORE_SET:
-                hub_scores, authority_scores = nx.hits(graph)
+                if algorithm in HUB_SCORE_SET:
+                    hub_scores, authority_scores = nx.hits(graph)
 
 
         # memory algorithms use a factor to modify the probability
@@ -329,40 +333,46 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                             neighbor_data_list.append(neighbor_data)
                         return neighbor_data_list
 
-                    if algorithm in BETWEENNESS_SET:
-                        betweenness_centralities_neighbors \
-                            = get_data_for_neighbors(betweenness_centralities, neighbor_nodes)
+                    if algorithm in ADVANCED_CLUSTERING_SET:
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_WEIGHTING_PARAM_A,
+                                                   value=','.join(str(param) for param in weighting_params_a)))
+                        env.append(client.V1EnvVar(name=ENVIRONMENT_WEIGHTING_PARAM_B,
+                                                   value=','.join(str(param) for param in weighting_params_b)))
 
-                        betweenness_centralities_neighbors_str = ','.join(
-                            str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
-                            for item
-                            in betweenness_centralities_neighbors
-                        )
-                        env.append(client.V1EnvVar(name=ENVIRONMENT_BETWEENNESS_CENTRALITIES_NEIGHBORS,
-                                                   value=betweenness_centralities_neighbors_str))
+                        if algorithm in BETWEENNESS_SET:
+                            betweenness_centralities_neighbors \
+                                = get_data_for_neighbors(betweenness_centralities, neighbor_nodes)
 
-                    if algorithm in EIGENVECTOR_SET:
-                        eigenvector_centralities_neighbors \
-                            = get_data_for_neighbors(eigenvector_centralities, neighbor_nodes)
+                            betweenness_centralities_neighbors_str = ','.join(
+                                str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
+                                for item
+                                in betweenness_centralities_neighbors
+                            )
+                            env.append(client.V1EnvVar(name=ENVIRONMENT_BETWEENNESS_CENTRALITIES_NEIGHBORS,
+                                                       value=betweenness_centralities_neighbors_str))
 
-                        eigenvector_centralities_neighbors_str = ','.join(
-                            str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
-                            for item
-                            in eigenvector_centralities_neighbors
-                        )
-                        env.append(client.V1EnvVar(name=ENVIRONMENT_EIGENVECTOR_CENTRALITIES_NEIGHBORS,
-                                                   value=betweenness_centralities_neighbors_str))
+                        if algorithm in EIGENVECTOR_SET:
+                            eigenvector_centralities_neighbors \
+                                = get_data_for_neighbors(eigenvector_centralities, neighbor_nodes)
 
-                    if algorithm in HUB_SCORE_SET:
-                        hub_scores_neighbors = get_data_for_neighbors(hub_scores, neighbor_nodes)
+                            eigenvector_centralities_neighbors_str = ','.join(
+                                str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
+                                for item
+                                in eigenvector_centralities_neighbors
+                            )
+                            env.append(client.V1EnvVar(name=ENVIRONMENT_EIGENVECTOR_CENTRALITIES_NEIGHBORS,
+                                                       value=betweenness_centralities_neighbors_str))
 
-                        hub_scores_neighbors_str = ','.join(
-                            str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
-                            for item
-                            in hub_scores_neighbors
-                        )
-                        env.append(client.V1EnvVar(name=ENVIRONMENT_HUB_SCORES_NEIGHBORS,
-                                                   value=hub_scores_neighbors_str))
+                        if algorithm in HUB_SCORE_SET:
+                            hub_scores_neighbors = get_data_for_neighbors(hub_scores, neighbor_nodes)
+
+                            hub_scores_neighbors_str = ','.join(
+                                str(round(item, ADVANCED_ALGORITHM_WEIGHT_ROUNDING))
+                                for item
+                                in hub_scores_neighbors
+                            )
+                            env.append(client.V1EnvVar(name=ENVIRONMENT_HUB_SCORES_NEIGHBORS,
+                                                       value=hub_scores_neighbors_str))
 
                     # memory algorithm specific environment variables
                     if algorithm in MEMORY_SET:
@@ -536,6 +546,11 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                     env.append(client.V1EnvVar(name=ENVIRONMENT_FACTOR,
                                                value=','.join(str(factor) for factor in factors)))
 
+            if algorithm in ADVANCED_CLUSTERING_SET:
+                env.append(client.V1EnvVar(name=ENVIRONMENT_WEIGHTING_PARAM_A,
+                                           value=','.join(str(param) for param in weighting_params_a)))
+                env.append(client.V1EnvVar(name=ENVIRONMENT_WEIGHTING_PARAM_B,
+                                           value=','.join(str(param) for param in weighting_params_b)))
             if algorithm in MEMORY_SET:
                 env.append(client.V1EnvVar(name=ENVIRONMENT_PRIOR_PARTNER_FACTOR,
                                            value=','.join(str(factor) for factor in prior_partner_factors)))
