@@ -358,7 +358,7 @@ def create_services_and_pods(spec, name, namespace, logger, **kwargs):
                                 in eigenvector_centralities_neighbors
                             )
                             env.append(client.V1EnvVar(name=ENVIRONMENT_EIGENVECTOR_CENTRALITIES_NEIGHBORS,
-                                                       value=betweenness_centralities_neighbors_str))
+                                                       value=eigenvector_centralities_neighbors_str))
 
                         if algorithm in HUB_SCORE_SET:
                             hub_scores_neighbors = get_data_for_neighbors(hub_scores, neighbor_nodes)

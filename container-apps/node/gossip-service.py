@@ -487,12 +487,17 @@ class WeightUpdate:
             a (float): Coefficient for self weights.
             b (float): Coefficient for other weights.
         """
+        # Calculate the sum of self weights and other weights
+        self_weight_sum = sum(self.weights.values())
+        other_weight_sum = sum(other_weights)
+
+        # Normalize self weights and other weights
+        self_normalized = [weight / self_weight_sum for weight in self.weights.values()]
+        other_normalized = [weight / other_weight_sum for weight in other_weights]
+
         updated_weights = {}
         for idx, n in enumerate(self.neighbors):
-            updated_weights[n] = a * self.weights[n] + b * other_weights[idx]
-
-        log.info("TESTING - updated_weights")
-        log.info(updated_weights)
+            updated_weights[n] = a * self_normalized[idx] + b * other_normalized[idx]
 
         self.weights = updated_weights
 
@@ -772,9 +777,6 @@ class CommunityBased(Algorithm):
             weight = (1 / self.comm_count) * (1 / self.community_members_count_dict[neighbor_community])
             self.weights[neighbor] = weight
 
-        log.info('TESTING - WEIGHTS:')
-        log.info(f'{self.weights}')
-
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
     """
@@ -849,9 +851,6 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
 
         self.gossip_lock.release()
 
-        log.info('TESTING - WEIGHTS:')
-        log.info(f'{self.algorithm.weights}')
-
         return peer_name
 
     def gossip(self):
@@ -864,8 +863,6 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         log.info('Starting to gossip.')
         try:
             self.gossip_lock.acquire()
-            log.info('TESTING - WEIGHTS:')
-            log.info(f'{self.algorithm.weights}')
             neighbor = self.algorithm.select_neighbor()
             log.info(f'Selecting neighbor {neighbor} to gossip using algorithm {self.algorithm.name}.')
             self.gossip_lock.release()

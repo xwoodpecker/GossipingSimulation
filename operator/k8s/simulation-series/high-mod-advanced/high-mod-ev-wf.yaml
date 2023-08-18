@@ -1,14 +1,16 @@
 apiVersion: gossip.io/v1
 kind: Simulation
 metadata:
-  name: test-series
+  name: high-mod-ev-wf
 spec:
   graphSelector:
     matchLabels:
-      series: high-mod-test
-  algorithm: eigenvector_community_probabilities
+      series: high-mod-series
+  algorithm: eigenvector_weighted
   visualize: false
   randomInitialization: false
   repetitions: 1
+  factor:
+    - 1.0
   weightingParamA:
-    - 0.5
+    - 0
