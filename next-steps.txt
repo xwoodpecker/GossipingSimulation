@@ -2,10 +2,13 @@
 -----------------------------------------------------------------------------------------------------------------------
 *Prio A:
 -----------------------------------------------------------------------------------------------------------------------
-- add test series definition (konzeption)
 - write evaluation chapter
+    * finish
+    * add average graph metrics to  results (i.e. avg path length etc.)
+    * potentially add more graph visualizations ?
+- add test series definition (konzeption?)
 - write conclusion chapter
-- add explanation why which graphs were selected for the test series
+
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B:
 -----------------------------------------------------------------------------------------------------------------------

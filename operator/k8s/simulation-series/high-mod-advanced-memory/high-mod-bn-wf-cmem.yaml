@@ -1,0 +1,22 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: high-mod-bn-wf-cmem
+spec:
+  graphSelector:
+    matchLabels:
+      series: high-mod-series
+  algorithm: betweenness_weighted_complex_memory
+  visualize: false
+  randomInitialization: false
+  repetitions: 1
+  factor:
+    - 1.0
+  weightingParamA:
+    - 0
+  priorPartnerFactor:
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.4
+    - 0.5

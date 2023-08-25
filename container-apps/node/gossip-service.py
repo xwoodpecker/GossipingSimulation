@@ -492,8 +492,15 @@ class WeightUpdate:
         other_weight_sum = sum(other_weights)
 
         # Normalize self weights and other weights
-        self_normalized = [weight / self_weight_sum for weight in self.weights.values()]
-        other_normalized = [weight / other_weight_sum for weight in other_weights]
+        if self_weight_sum == 0:
+            self_normalized = [weight for weight in self.weights.values()]
+        else:
+            self_normalized = [weight / self_weight_sum for weight in self.weights.values()]
+        if other_weight_sum == 0:
+            other_normalized = [weight for weight in other_weights]
+        else:
+            other_normalized = [weight / other_weight_sum for weight in other_weights]
+
 
         updated_weights = {}
         for idx, n in enumerate(self.neighbors):
