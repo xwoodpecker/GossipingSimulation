@@ -1,0 +1,14 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: gnutella-series-cp-cm
+spec:
+  graphSelector:
+    matchLabels:
+      series: gnutella-series
+  algorithm: community_probabilities_complex_memory
+  visualize: false
+  randomInitialization: false
+  repetitions: 10
+  priorPartnerFactor:
+    - 0.5

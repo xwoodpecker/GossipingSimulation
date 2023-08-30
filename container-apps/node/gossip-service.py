@@ -616,6 +616,8 @@ class AdvancedWeightedFactorComplexMemory(WeightedFactorComplexMemory, WeightUpd
         self.update_weights(self.advanced_weights_neighbors,
                             self.params_a[self.factor_index],
                             self.params_b[self.factor_index])
+        # workaround for forget logic
+        self.start_weights = copy.deepcopy(self.weights)
 
     def set_next_parameters(self):
         """
@@ -626,6 +628,8 @@ class AdvancedWeightedFactorComplexMemory(WeightedFactorComplexMemory, WeightUpd
         b = self.params_b[self.factor_index]
         log.info(f"Set new a to {a} and new b to {b}")
         self.update_weights(self.advanced_weights_neighbors, a, b)
+        # workaround for forget logic
+        self.start_weights = copy.deepcopy(self.weights)
 
 
 class AdvancedCommunityProbabilities(CommunityProbabilities, WeightUpdate):
@@ -734,6 +738,8 @@ class AdvancedCommunityProbabilitiesComplexMemory(CommunityProbabilitiesComplexM
         self.update_weights(self.advanced_weights_neighbors,
                             self.params_a[self.factor_index],
                             self.params_b[self.factor_index])
+        # workaround for forget logic
+        self.start_weights = copy.deepcopy(self.weights)
 
     def set_next_parameters(self):
         """
@@ -745,6 +751,8 @@ class AdvancedCommunityProbabilitiesComplexMemory(CommunityProbabilitiesComplexM
         b = self.params_b[self.factor_index]
         log.info(f"Set new a to {a} and new b to {b}")
         self.update_weights(self.advanced_weights_neighbors, a, b)
+        # workaround for forget logic
+        self.start_weights = copy.deepcopy(self.weights)
 
 
 class CommunityBased(Algorithm):

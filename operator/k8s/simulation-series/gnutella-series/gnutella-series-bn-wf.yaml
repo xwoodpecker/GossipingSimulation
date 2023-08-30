@@ -1,0 +1,16 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: gnutella-series-bn-wf
+spec:
+  graphSelector:
+    matchLabels:
+      series: gnutella-series
+  algorithm: betweenness_weighted
+  visualize: false
+  randomInitialization: false
+  repetitions: 10
+  factor:
+    - 1.0
+  weightingParamA:
+    - 0
