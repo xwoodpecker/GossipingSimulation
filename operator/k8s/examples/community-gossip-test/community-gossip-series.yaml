@@ -1,0 +1,12 @@
+apiVersion: gossip.io/v1
+kind: Simulation
+metadata:
+  name: community-gossip-test-series
+spec:
+  graphSelector:
+    matchLabels:
+      series: high-mod-test
+  algorithm: community_based
+  visualize: false
+  randomInitialization: false
+  repetitions: 1

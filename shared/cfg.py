@@ -173,10 +173,10 @@ ADVANCED_ALGORITHM_WEIGHT_ROUNDING = 4
 
 CREATE_POD_BATCH_SIZE = 50
 REGISTRY_SECRET_NAME = "reg-cred-secret"
-DOCKER_NODE_IMAGE = "gossip-registry:32652/node-app:advanced-series_v3"
+DOCKER_NODE_IMAGE = "gossip-registry:32652/node-app:community-gossip"
 # DOCKER_NODE_IMAGE = "xwoodpecker/node-app:latest"
 DOCKER_NODE_NAME = "node-app"
-DOCKER_RUNNER_IMAGE = "gossip-registry:32652/runner-app:advanced-series_v3"
+DOCKER_RUNNER_IMAGE = "gossip-registry:32652/runner-app:community-gossip"
 # DOCKER_RUNNER_IMAGE = "xwoodpecker/runner-app:latest"
 DOCKER_RUNNER_NAME = "runner-app"
 

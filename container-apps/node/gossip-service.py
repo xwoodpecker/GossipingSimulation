@@ -791,6 +791,17 @@ class CommunityBased(Algorithm):
             # Calculate the weight based on the formula
             weight = (1 / self.comm_count) * (1 / self.community_members_count_dict[neighbor_community])
             self.weights[neighbor] = weight
+        log.info(f'Weights set to {self.weights}.')
+
+    def select_neighbor(self):
+        """
+        Select a neighbor based on weights.
+
+        Returns:
+            object: The selected neighbor.
+        """
+        selected = choose_neighbor(self.neighbors, self.weights)
+        return selected
 
 
 class GossipService(gossip_pb2_grpc.GossipServicer):
@@ -828,8 +839,6 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
         self.listen_thread = threading.Thread(target=self.listen_for_connections)
         self.gossip_lock = threading.Lock()
         self.listen_thread.start()
-        # for debug:
-        self.log_history = []
 
     def process_gossip_data(self, data):
         """
@@ -856,9 +865,6 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
                 self.algorithm.forget()
         # log the participation as a value entry
         self.value_entries.append(ValueEntry(self.participations, self.value))
-
-        # for debug:
-        self.log_history.append((self.participations, self.value, peer_name))
 
         # remember the neighbor in case it is a memory algorithm
         if isinstance(self.algorithm, Memory):
@@ -977,7 +983,6 @@ class GossipService(gossip_pb2_grpc.GossipServicer):
             gossip_pb2.StopApplicationResponse: The StopApplication response.
         """
         log.info('[GRPC StopApplication invoked]')
-        print(self.log_history)
         self.stop_listening = True
         self.listen_thread.join()
         log.info("Stopped listening.")
