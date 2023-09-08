@@ -28,8 +28,8 @@
 - run:
     * gutella-series-cp-cm-ext
     * gutella-series-bn-wf-cmem
-- check italian algorithm WTF is wrong?
-    * rerun italian algorithm after fix? (also on gnutella?)
+    * rerun italian algorithm on high-mod
+    * rerun italain algorithm also on gnutella
 - .readme file
 - delete help files
 -----------------------------------------------------------------------------------------------------------------------
