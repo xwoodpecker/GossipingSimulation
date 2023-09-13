@@ -26,10 +26,8 @@
 *Prio A
 -----------------------------------------------------------------------------------------------------------------------
 - run:
-    * gutella-series-cp-cm-ext
-    * gutella-series-bn-wf-cmem
     * rerun italian algorithm on high-mod
-    * rerun italain algorithm also on gnutella
+    * rerun italian algorithm also on gnutella (ongoing)
 - .readme file
 - delete help files
 -----------------------------------------------------------------------------------------------------------------------
