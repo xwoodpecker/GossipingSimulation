@@ -28,7 +28,7 @@
 - run:
     * rerun italian algorithm on high-mod
     * rerun italian algorithm also on gnutella (ongoing)
-- .readme file
+- .readme file (replace <repository-url>)
 - delete help files
 -----------------------------------------------------------------------------------------------------------------------
 *Prio B
