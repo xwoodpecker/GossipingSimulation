@@ -42,7 +42,7 @@ The system's architecture comprises three main components:
    Simulations can be run using different algorithms, configurations and networks.
    They can be evaluated by comparing metrics and statistics. 
    Various tools and routines can be used for analyzing simulation results, 
-- including automated calculations and diagram generation.
+   including automated calculations and diagram generation.
 
 ![Top-Level Design](./.resources/bausteinsicht.png)
 
@@ -157,6 +157,9 @@ Follow these steps to run a simulation:
 5. Apply the simulation resource (by using `kubectl apply -f`)
 6. The operator now runs the simulations (logs can be checked during runtime or afterwards)
 7. When the simulation is completed, delete the simulation resource (by using `kubectl delete -f`)
+
+
+![Simulation Workflow](./.resources/sequence-sim-workflow_colored.png)
 
 ## Customization
 You can customize the operator by modifying the python scripts and any other relevant files. 
