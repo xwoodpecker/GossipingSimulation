@@ -78,7 +78,7 @@ The Node Service implements different gossiping algorithms for communication amo
      In summary, the Node Service's primary function is to execute the selected gossiping algorithm, enabling nodes to exchange information with their neighbors. The available algorithms offer different strategies for partner selection and information exchange, allowing for diverse simulations of network behavior and dynamics.
 
   
-![Top-Level Design](../../.resources/pod-communications.png)
+![Pod Communications](../../.resources/pod-communications.png)
 
 
 

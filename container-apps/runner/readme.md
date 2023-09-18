@@ -51,7 +51,7 @@ It is highly configurable and can be used for various gossip-based simulations.
     Then, the next graph in the series can be initiated or the simulation can be stopped.
     When the last simulation on the last graph has finished, the application stops.
 
-![Top-Level Design](../../.resources/pod-communications.png)
+![Pod Communications](../../.resources/pod-communications.png)
 
 ## Prerequisites
 Before using this script within a K8s cluster, ensure you have the following prerequisites:
