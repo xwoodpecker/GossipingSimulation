@@ -28,6 +28,7 @@ The system's architecture comprises three main components:
    Users interact with a Command-Line Interface (CLI) to generate network graphs.
    They specify the generation algorithm as well as specific parameters.
    Graphs can then be obtained as adjacency lists or k8s resources in YAML representation.
+    For more information, see the [CLI README](./graph-generation/readme.md).
 
 - **Kubernetes Cluster Simulation**:
 
@@ -35,6 +36,9 @@ The system's architecture comprises three main components:
   The Simulation Operator manages the resource lifecycles, ensuring efficient use of Kubernetes resources.
   When a simulation is run, the operator creates pods for each network node.
   Then, a runner pod is deployed, which manages the simulation.
+  More information can be found in the respective README files, 
+  such as the [Operator README](./operator/readme.md), [Runner README](./container-apps/runner/readme.md), 
+  and [Node README](./container-apps/node/readme.md).
 
 
 - **Result Evaluation and Comparison**
@@ -43,6 +47,7 @@ The system's architecture comprises three main components:
    They can be evaluated by comparing metrics and statistics. 
    Various tools and routines can be used for analyzing simulation results, 
    including automated calculations and diagram generation.
+    For more information, see the [Evaluation README](./evaluation/readme.md).
 
 ![Top-Level Design](./.resources/bausteinsicht.png)
 
@@ -142,6 +147,9 @@ kubectl create -f .\graph_generation\k8s\graph-resource.yaml
 
 kubectl create -f .\operator\k8s\simulation-resource.yaml
 ```
+
+Example simulations can be found under [./operator/k8s/examples/](./operator/k8s/examples/).
+The simulations that were run for the thesis project can be found under [./operator/k8s/simulation-series/](./operator/k8s/simulation-series/).
 
 ## Deploying the Operator
 

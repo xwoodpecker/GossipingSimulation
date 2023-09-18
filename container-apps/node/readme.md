@@ -10,10 +10,77 @@ Its methods are invoked by the "Simulation Runner".
 The Runner is responsible for managing the simulation.
 This README provides an overview of the script, its purpose, and instructions for usage.
 
-Key Features:
+### Key Features:
 - Dynamic algorithm selection based on configuration.
 - Customizable algorithm parameters.
 - Graceful shutdown using a stop event.
+
+### Workflow: 
+
+The Node Service implements different gossiping algorithms for communication among network nodes. 
+ a summarized workflow and behavior of the Node Service, including the various algorithms:
+
+- **Node Initialization:**
+
+    Node Pods are created within Kubernetes, representing individual network nodes.
+    Each Node Pod initializes itself with necessary data through environment variables, including the selected gossiping algorithm and information about neighboring nodes required for gossip exchange.
+
+
+- **Algorithm Initialization:**
+
+    The Node Service is initialized with a specific gossiping algorithm, which may include extensions like memory-based behavior.
+    The available algorithms include:
+    
+  - *Baseline Algorithm*:
+  This algorithm selects gossip partners entirely randomly, serving as a reference point for other algorithms.
+  - *WeightedFactor Algorithm*: 
+  It introduces partner weighting, favoring partners within the same community. The weight is a fixed value multiplied by a randomly selected probability.
+  - *CommunityProbabilities Algorithm*: 
+  It calculates probabilities for each neighboring node's membership in the same community, allowing targeted weighting in partner selection.
+  - *Advanced Algorithms*:
+  These include weighting by betweenness centralities, eigenvector centralities and hub scores. Each advanced algorithm has two variations.
+  One of them includes a dynamic combination with the WeightedFactor algorithm, which also allows pure weighting only according to advanced metrics.
+  Furthermore, a combination with the weights of the CommunityProbabilities Algorithm is implemented.
+  - *Community-Based Gossiping*:
+  The algorithm taken from the related work ["Community-based gossip algorithm for distributed averaging"](https://github.com/ChristelSirocchi/gossip_modularity)
+  is also implemented.
+  - *Memory-Based Extensions*: 
+  These extensions introduce memory, where nodes remember previous communication partners and may have reduced probability of reselecting them. The "ComplexMemory" extension further modifies weights upon receiving new values.
+  These algorithms can be initialized by the Simulation Operator based on user-defined settings.
+
+ 
+![Algorithm classes](../../.resources/algorithm_classes.png)
+
+- **Simulation Runner Coordination**:
+
+    The Node Service operates under the coordination of the Simulation Runner Pod.
+    The Runner keeps information on all the nodes in a dictionary of stubs.
+    The simulation is coordinated by executing Remote Procedure Calls.
+
+
+- **Gossiping Process**:
+
+     When instructed by the Simulation Runner, a Node Service selects a neighboring node based on the chosen algorithm.
+     It initiates a communication session with the selected neighbor using TCP to simulate realistic network communication.
+     During communication, nodes may exchange information, and the algorithm-specific logic is applied to determine if they should update their own values.
+     The gossiping process continues until a convergence criterion is met, typically when nodes agree on a common minimum value.
+
+
+- **Result Storage**:
+
+     The Node Service communicates the results of gossiping, which may include updated values or convergence status, to the Simulation Runner.
+     These results are then collected and stored in Object Storage.
+
+
+- **Termination**:
+
+     The Node Service can be terminated by the Simulation Runner upon completion of the simulation.
+     In summary, the Node Service's primary function is to execute the selected gossiping algorithm, enabling nodes to exchange information with their neighbors. The available algorithms offer different strategies for partner selection and information exchange, allowing for diverse simulations of network behavior and dynamics.
+
+  
+![Top-Level Design](../../.resources/pod-communications.png)
+
+
 
 ## Prerequisites
 Before using this script within a K8s cluster, ensure you have the following prerequisites:

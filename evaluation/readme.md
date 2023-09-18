@@ -10,12 +10,10 @@ This script is designed to process data from the Minio Object Storage, and store
 Before using the script, make sure you have the following prerequisites in place:
 
 - Python 3.x installed on your system.
-- Required Python packages installed. You can install them using pip:
-
-```bash
-pip install pandas numpy pytz minio
-```
-
+- Required Python packages installed. You can install them using:
+    ```bash
+    pip install pandas numpy pytz minio
+    ```
 - Access to a Minio Object Storage instance with the necessary credentials (access key and secret key).
 
 ## Configuration
